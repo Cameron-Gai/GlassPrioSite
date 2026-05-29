@@ -21,8 +21,15 @@
 
 <div class="upload">
   <label class="dropzone" for="photoInput">
+    <span class="icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="12" cy="12" r="3.2" />
+        <path d="M8 5l1.5-2h5L16 5" />
+      </svg>
+    </span>
     <strong>Tap to add photos</strong>
-    <span>Photos help our team triage faster. Optional.</span>
+    <span class="hint">Use your camera or library</span>
     <input
       id="photoInput"
       type="file"
@@ -48,7 +55,7 @@
 <style>
   .upload {
     display: grid;
-    gap: 0.85rem;
+    gap: 0.65rem;
   }
 
   .dropzone {
@@ -57,18 +64,40 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    padding: 1.5rem 1rem;
-    border: 2px dashed var(--color-border);
+    gap: 0.25rem;
+    padding: 1.4rem 1rem;
+    border: 1.5px dashed var(--color-border-strong);
     border-radius: var(--radius-md);
     background: var(--color-surface);
     color: var(--color-muted);
     text-align: center;
     cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .dropzone:hover {
+    border-color: var(--color-primary);
+    background: var(--color-surface-tint);
+  }
+
+  .dropzone .icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    margin-bottom: 0.3rem;
   }
 
   .dropzone strong {
     color: var(--color-primary);
+  }
+
+  .hint {
+    font-size: 0.85rem;
   }
 
   .dropzone input {

@@ -30,12 +30,32 @@ export interface AddressInfo {
   zip: string;
 }
 
+export interface LadderInfo {
+  required: boolean;
+  story: string;
+}
+
+export interface SpecialInstructions {
+  gateCode: string;
+  hasDog: boolean;
+  parkingNotes: string;
+  preferredWindow: string;
+  other: string;
+}
+
+export interface WarrantyInfo {
+  relatedJob: string;
+  originalDate: string;
+}
+
 export interface IssueDetails {
+  serviceLocation: string;
   description: string;
   happenedAt: string;
   isSecure: boolean;
   hasBrokenGlass: boolean;
   hasWaterOrWeatherEntry: boolean;
+  ladder: LadderInfo;
   photos: string[];
 }
 
@@ -51,6 +71,7 @@ export interface RoutingSummary {
   isDuringBusinessHours: boolean;
   businessHoursTimezone: string;
   routedBy: 'triage-tree';
+  priorityUpgrade: boolean;
 }
 
 export interface IntakePayload {
@@ -62,6 +83,8 @@ export interface IntakePayload {
   propertyType: PropertyType;
   answers: Record<string, string>;
   issueDetails: IssueDetails;
+  specialInstructions: SpecialInstructions;
+  warranty: WarrantyInfo | null;
   schedulingPreference: SchedulingPreference;
   createdAt: string;
 }

@@ -1,47 +1,55 @@
 <script lang="ts">
-  import { intakeStore, currentTriageNode, type WizardStep } from '$lib/stores/intakeStore';
+  import {
+    intakeStore,
+    currentTriageNode,
+    currentPhaseIndex,
+    type WizardStep
+  } from '$lib/stores/intakeStore';
   import QuestionCard from './QuestionCard.svelte';
-  import ProgressIndicator from './ProgressIndicator.svelte';
-  import PropertyTypeForm from './PropertyTypeForm.svelte';
+  import PhaseStepper from './PhaseStepper.svelte';
+  import JobTypeBanner from './JobTypeBanner.svelte';
+  import PriorityUpgradeAsk from './PriorityUpgradeAsk.svelte';
+  import WarrantyDetailForm from './WarrantyDetailForm.svelte';
+  import IssueDetailsForm from './IssueDetailsForm.svelte';
+  import SiteAccessForm from './SiteAccessForm.svelte';
   import CustomerInfoForm from './CustomerInfoForm.svelte';
   import AddressForm from './AddressForm.svelte';
-  import IssueDetailsForm from './IssueDetailsForm.svelte';
-  import PhotoUploadMock from './PhotoUploadMock.svelte';
   import SchedulingPreferenceForm from './SchedulingPreferenceForm.svelte';
   import ReviewSubmission from './ReviewSubmission.svelte';
   import ConfirmationScreen from './ConfirmationScreen.svelte';
-  import PriorityBadge from './PriorityBadge.svelte';
 
   const stepLabels: Record<WizardStep, string> = {
     triage: 'Tell us what you need',
-    'property-type': 'Property type',
-    customer: 'Your contact info',
+    'priority-upgrade': 'Choose your timing',
+    'warranty-detail': 'Tell us about the previous job',
+    issue: "What's going on",
+    site: 'Property & access',
+    contact: 'Your contact info',
     address: 'Service address',
-    'issue-details': 'Issue details',
-    photos: 'Photos (optional)',
     scheduling: 'When works best',
     review: 'Review & submit',
     confirmation: 'Done'
   };
 
-  const stepOrder: WizardStep[] = [
-    'triage',
-    'property-type',
-    'customer',
-    'address',
-    'issue-details',
-    'photos',
-    'scheduling',
-    'review'
-  ];
-
-  let attemptedAdvance = false;
-
   function isStepValid(state: typeof $intakeStore): boolean {
     switch (state.step) {
-      case 'property-type':
-        return !!state.propertyType;
-      case 'customer':
+      case 'warranty-detail':
+        return !!state.warranty?.relatedJob.trim();
+      case 'issue':
+        return (
+          state.issueDetails.serviceLocation.trim() !== '' &&
+          state.issueDetails.description.trim().length >= 5 &&
+          state.issueDetails.happenedAt.trim() !== '' &&
+          (!state.issueDetails.ladder.required || state.issueDetails.ladder.story.trim() !== '')
+        );
+      case 'site': {
+        const photosRequired = state.selectedJobType?.consultationFormat === 'virtual';
+        return (
+          !!state.propertyType &&
+          (!photosRequired || state.issueDetails.photos.length > 0)
+        );
+      }
+      case 'contact':
         return (
           state.customer.firstName.trim() !== '' &&
           state.customer.lastName.trim() !== '' &&
@@ -55,33 +63,26 @@
           state.address.state.trim() !== '' &&
           /^\d{5}(-\d{4})?$/.test(state.address.zip.trim())
         );
-      case 'issue-details':
-        return (
-          state.issueDetails.description.trim().length >= 5 &&
-          state.issueDetails.happenedAt.trim() !== ''
-        );
-      case 'photos':
-        return true;
       case 'scheduling':
         return !!state.schedulingPreference;
-      case 'review':
-        return true;
       default:
         return true;
     }
   }
 
+  let attempted = false;
+
   function next() {
     if (!isStepValid($intakeStore)) {
-      attemptedAdvance = true;
+      attempted = true;
       return;
     }
-    attemptedAdvance = false;
+    attempted = false;
     intakeStore.advance();
   }
 
   function back() {
-    attemptedAdvance = false;
+    attempted = false;
     intakeStore.goBack();
   }
 
@@ -91,98 +92,118 @@
 
   function reset() {
     intakeStore.reset();
-    attemptedAdvance = false;
+    attempted = false;
   }
 
   $: state = $intakeStore;
   $: node = $currentTriageNode;
-  $: currentStepIndex = stepOrder.indexOf(state.step as WizardStep);
-  $: totalSteps = stepOrder.length;
-  $: showProgress = state.step !== 'confirmation';
+  $: phaseIdx = $currentPhaseIndex;
+  $: photosRequired = state.selectedJobType?.consultationFormat === 'virtual';
   $: canGoBack =
     state.step !== 'confirmation' &&
-    (state.step !== 'triage' || state.history.length > 0);
+    (state.step !== 'triage' || state.triageHistory.length > 0);
+  $: showBanner =
+    state.selectedJobType &&
+    state.step !== 'triage' &&
+    state.step !== 'priority-upgrade' &&
+    state.step !== 'review' &&
+    state.step !== 'confirmation';
 </script>
 
 <div class="wizard">
-  {#if showProgress}
-    <ProgressIndicator
-      stepLabel={stepLabels[state.step]}
-      current={Math.max(1, currentStepIndex + 1)}
-      total={totalSteps}
-    />
+  {#if state.step !== 'confirmation'}
+    <div class="head">
+      <PhaseStepper currentIndex={phaseIdx} />
+      <p class="step-label">{stepLabels[state.step]}</p>
+    </div>
   {/if}
 
-  {#if state.selectedJobType && state.step !== 'triage' && state.step !== 'confirmation'}
-    <div class="routed" class:emergency={state.isEmergency}>
-      <div>
-        <span class="label">Routed to</span>
-        <strong>{state.selectedJobType.name}</strong>
-      </div>
-      <PriorityBadge priority={state.selectedJobType.priority} />
-    </div>
+  {#if showBanner && state.selectedJobType}
+    <JobTypeBanner
+      job={state.selectedJobType}
+      isEmergency={state.isEmergency}
+      isDuringBusinessHours={state.isDuringBusinessHours}
+      priorityUpgrade={state.priorityUpgrade}
+    />
   {/if}
 
   <div class="step-body">
     {#if state.step === 'triage' && node}
       <QuestionCard {node} onSelect={(option) => intakeStore.selectOption(option)} />
-    {:else if state.step === 'property-type'}
-      <h2>What type of property is this for?</h2>
-      <PropertyTypeForm value={state.propertyType} />
-      {#if attemptedAdvance && !isStepValid(state)}
-        <p class="form-error">Select a property type to continue.</p>
-      {/if}
-    {:else if state.step === 'customer'}
-      <h2>How can we reach you?</h2>
-      <CustomerInfoForm value={state.customer} showErrors={attemptedAdvance} />
+    {:else if state.step === 'priority-upgrade'}
+      <PriorityUpgradeAsk />
+    {:else if state.step === 'warranty-detail' && state.warranty}
+      <header class="screen-head">
+        <h2>A few details about the previous job</h2>
+        <p>This helps us pull the right file before we come out.</p>
+      </header>
+      <WarrantyDetailForm value={state.warranty} showErrors={attempted} />
+    {:else if state.step === 'issue'}
+      <header class="screen-head">
+        <h2>Tell us what's going on</h2>
+        <p>Be as specific as you can — it helps us route the right person.</p>
+      </header>
+      <IssueDetailsForm value={state.issueDetails} showErrors={attempted} />
+    {:else if state.step === 'site'}
+      <header class="screen-head">
+        <h2>Property and access</h2>
+        <p>This helps our team get to you and triage faster.</p>
+      </header>
+      <SiteAccessForm
+        propertyType={state.propertyType}
+        special={state.specialInstructions}
+        photos={state.issueDetails.photos}
+        {photosRequired}
+        showErrors={attempted}
+      />
+    {:else if state.step === 'contact'}
+      <header class="screen-head">
+        <h2>How can we reach you?</h2>
+      </header>
+      <CustomerInfoForm value={state.customer} showErrors={attempted} />
     {:else if state.step === 'address'}
-      <h2>Where is the service needed?</h2>
-      <AddressForm value={state.address} showErrors={attemptedAdvance} />
-    {:else if state.step === 'issue-details'}
-      <h2>Tell us about the issue</h2>
-      <IssueDetailsForm value={state.issueDetails} showErrors={attemptedAdvance} />
-    {:else if state.step === 'photos'}
-      <h2>Add photos (optional)</h2>
-      <PhotoUploadMock photos={state.uploadedPhotos} />
+      <header class="screen-head">
+        <h2>Where is the service needed?</h2>
+      </header>
+      <AddressForm value={state.address} showErrors={attempted} />
     {:else if state.step === 'scheduling'}
-      <h2>When would you prefer to be contacted or seen?</h2>
+      <header class="screen-head">
+        <h2>When would you prefer to be contacted or seen?</h2>
+      </header>
       <SchedulingPreferenceForm value={state.schedulingPreference} />
-      {#if attemptedAdvance && !isStepValid(state)}
+      {#if attempted && !isStepValid(state)}
         <p class="form-error">Pick a preferred window to continue.</p>
       {/if}
     {:else if state.step === 'review'}
-      <h2>Review your request</h2>
+      <header class="screen-head">
+        <h2>Review your request</h2>
+        <p>Double-check everything below, then submit.</p>
+      </header>
       <ReviewSubmission {state} />
       {#if state.submitError}
         <p class="form-error">{state.submitError}</p>
       {/if}
     {:else if state.step === 'confirmation'}
-      <ConfirmationScreen
-        confirmationNumber={state.confirmationNumber ?? ''}
-        jobName={state.selectedJobType?.name ?? ''}
-        priority={state.selectedJobType?.priority ?? ''}
-        duration={state.selectedJobType?.duration ?? ''}
-        isEmergency={state.isEmergency}
-        isDuringBusinessHours={state.isDuringBusinessHours}
-        onReset={reset}
-      />
+      <ConfirmationScreen {state} onReset={reset} />
     {/if}
   </div>
 
-  {#if state.step !== 'triage' && state.step !== 'confirmation'}
-    <div class="actions">
-      <button type="button" class="ghost" on:click={back} disabled={!canGoBack}>Back</button>
-      {#if state.step === 'review'}
-        <button type="button" class="primary" on:click={submit} disabled={state.submitting}>
-          {state.submitting ? 'Submitting…' : 'Submit request'}
-        </button>
+  {#if state.step !== 'confirmation' && state.step !== 'priority-upgrade'}
+    <div class="actions" class:single={state.step === 'triage'}>
+      {#if state.step === 'triage'}
+        {#if canGoBack}
+          <button type="button" class="ghost" on:click={back}>Back</button>
+        {/if}
       {:else}
-        <button type="button" class="primary" on:click={next}>Continue</button>
+        <button type="button" class="ghost" on:click={back} disabled={!canGoBack}>Back</button>
+        {#if state.step === 'review'}
+          <button type="button" class="primary" on:click={submit} disabled={state.submitting}>
+            {state.submitting ? 'Submitting…' : 'Submit request'}
+          </button>
+        {:else}
+          <button type="button" class="primary" on:click={next}>Continue</button>
+        {/if}
       {/if}
-    </div>
-  {:else if state.step === 'triage' && canGoBack}
-    <div class="actions left">
-      <button type="button" class="ghost" on:click={back}>Back</button>
     </div>
   {/if}
 </div>
@@ -194,43 +215,39 @@
     gap: 1.1rem;
   }
 
-  .routed {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.75rem 0.9rem;
-    background: #eef4fb;
-    border: 1px solid #cfdef0;
-    border-radius: var(--radius-md);
+  .head {
+    display: grid;
+    gap: 0.4rem;
   }
 
-  .routed.emergency {
-    background: var(--color-emergency-bg);
-    border-color: #f5c2bb;
-  }
-
-  .routed .label {
-    display: block;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-muted);
-  }
-
-  .routed strong {
+  .step-label {
+    margin: 0;
     color: var(--color-text);
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+
+  .screen-head {
+    display: grid;
+    gap: 0.25rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .screen-head h2 {
+    margin: 0;
+    font-size: 1.4rem;
     line-height: 1.25;
   }
 
-  .step-body h2 {
-    margin: 0 0 0.85rem;
-    font-size: 1.4rem;
+  .screen-head p {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.95rem;
   }
 
   .form-error {
     color: var(--color-emergency);
-    margin: 0.5rem 0 0;
+    margin: 0.6rem 0 0;
     font-size: 0.9rem;
   }
 
@@ -238,19 +255,20 @@
     display: flex;
     gap: 0.6rem;
     justify-content: space-between;
-    margin-top: 0.25rem;
+    margin-top: 0.4rem;
   }
 
-  .actions.left {
+  .actions.single {
     justify-content: flex-start;
   }
 
   .primary,
   .ghost {
-    padding: 0.8rem 1.2rem;
+    padding: 0.85rem 1.3rem;
     border-radius: var(--radius-md);
     font-weight: 600;
-    min-width: 110px;
+    min-width: 120px;
+    transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
   }
 
   .primary {
@@ -260,6 +278,7 @@
 
   .primary:hover:not(:disabled) {
     background: var(--color-primary-hover);
+    transform: translateY(-1px);
   }
 
   .ghost {
@@ -273,11 +292,14 @@
   }
 
   @media (max-width: 520px) {
-    .step-body h2 {
+    .screen-head h2 {
       font-size: 1.2rem;
     }
     .actions {
       flex-direction: column-reverse;
+    }
+    .actions.single {
+      flex-direction: row;
     }
     .primary,
     .ghost {
