@@ -43,16 +43,6 @@
     </dl>
   </section>
 
-  {#if state.warranty}
-    <section class="block">
-      <h3>Warranty context</h3>
-      <dl>
-        <div><dt>Previous job</dt><dd>{state.warranty.relatedJob || '—'}</dd></div>
-        <div><dt>Original work</dt><dd>{state.warranty.originalDate || '—'}</dd></div>
-      </dl>
-    </section>
-  {/if}
-
   <section class="block">
     <h3>Property & access</h3>
     <dl>

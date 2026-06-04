@@ -30,22 +30,13 @@ export interface JobType {
 
 export const jobTypes: JobType[] = [
   {
+    // Booked internally by a client manager — not exposed in public intake.
     name: 'Advanced Measurement System (AMS)',
     priority: 'High',
     duration: '2 hours',
     category: 'measurement',
-    customerFacing: true,
-    publicIntakeEnabled: true,
-    customerLabel: 'On-site Measurement (AMS)',
-    summary:
-      'A detailed on-site measurement that produces a documented window schedule we keep on file for future orders.',
-    includes: [
-      'Numbered measurement of every opening',
-      'Photos saved with your file',
-      'Future orders skip the measurement visit'
-    ],
-    pricing: { display: '$350 per building' },
-    consultationFormat: 'on-site'
+    customerFacing: false,
+    publicIntakeEnabled: false
   },
   {
     name: 'Critical - Measure and Installation Requirements',
@@ -358,29 +349,21 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: false
   },
   {
+    // Warranty work is handled outside of the public intake site.
     name: 'Warranty Assessment',
     priority: 'Urgent',
     duration: '2 hours',
     category: 'warranty',
-    customerFacing: true,
-    publicIntakeEnabled: true,
-    customerLabel: 'Warranty Assessment',
-    summary:
-      'A manager will assess the issue with a job we previously installed and determine the next steps.',
-    pricing: { display: 'No charge for assessment' },
-    consultationFormat: 'on-site'
+    customerFacing: false,
+    publicIntakeEnabled: false
   },
   {
     name: 'Warranty Repair',
     priority: 'Urgent',
     duration: '2 hours',
     category: 'warranty',
-    customerFacing: true,
-    publicIntakeEnabled: true,
-    customerLabel: 'Warranty Repair',
-    summary: 'A return visit to repair an issue with a job we previously installed.',
-    pricing: { display: 'No charge for warranty repair' },
-    consultationFormat: 'on-site'
+    customerFacing: false,
+    publicIntakeEnabled: false
   }
 ];
 

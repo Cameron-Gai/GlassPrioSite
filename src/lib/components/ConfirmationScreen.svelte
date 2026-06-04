@@ -23,12 +23,6 @@
             'On arrival we will clean up, board up if needed, and quote any repair'
           ];
     }
-    if (job.category === 'warranty') {
-      return [
-        'A manager will review your warranty request',
-        'You will be contacted to confirm the inspection or repair appointment'
-      ];
-    }
     if (job.category === 'other') {
       return [
         'A client manager will review your request',

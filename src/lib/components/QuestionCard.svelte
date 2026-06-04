@@ -1,13 +1,13 @@
 <script lang="ts">
   import OptionButton from './OptionButton.svelte';
   import OptionCard from './OptionCard.svelte';
+  import YesNoTiles from './YesNoTiles.svelte';
   import type { TriageNode, TriageOption } from '$lib/triage/triageTree';
 
   export let node: TriageNode;
   export let onSelect: (option: TriageOption) => void;
 
-  $: isEmergencyNode = node.id === 'emergency';
-  $: useCardGrid = node.layout === 'cards';
+  $: isEmergencyDetail = node.id === 'emergency-which';
 </script>
 
 <section class="card fade-in">
@@ -18,7 +18,9 @@
     {/if}
   </header>
 
-  {#if useCardGrid}
+  {#if node.layout === 'yesno'}
+    <YesNoTiles options={node.options} {onSelect} />
+  {:else if node.layout === 'cards'}
     <div class="grid">
       {#each node.options as option (option.id)}
         <OptionCard
@@ -36,7 +38,7 @@
           label={option.label}
           helperText={option.helperText}
           icon={option.icon}
-          emphasis={isEmergencyNode && option.isEmergency ? 'emergency' : 'default'}
+          emphasis={isEmergencyDetail ? 'emergency' : 'default'}
           on:click={() => onSelect(option)}
         />
       {/each}
@@ -48,37 +50,38 @@
   .card {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.2rem;
   }
 
   header {
     display: grid;
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
 
   h2 {
     margin: 0;
-    font-size: 1.4rem;
-    line-height: 1.25;
-    color: var(--color-text);
+    font-size: 1.7rem;
+    line-height: 1.2;
+    color: var(--color-text-strong);
+    font-weight: 700;
   }
 
   .helper {
     margin: 0;
     color: var(--color-muted);
-    font-size: 0.95rem;
+    font-size: 0.98rem;
   }
 
   .list {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
+    gap: 0.6rem;
   }
 
   .grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.65rem;
+    gap: 0.75rem;
   }
 
   @media (max-width: 720px) {
@@ -95,7 +98,7 @@
 
   @media (max-width: 640px) {
     h2 {
-      font-size: 1.25rem;
+      font-size: 1.4rem;
     }
   }
 </style>

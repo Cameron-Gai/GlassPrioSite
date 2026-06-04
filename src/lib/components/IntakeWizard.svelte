@@ -9,7 +9,6 @@
   import PhaseStepper from './PhaseStepper.svelte';
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PriorityUpgradeAsk from './PriorityUpgradeAsk.svelte';
-  import WarrantyDetailForm from './WarrantyDetailForm.svelte';
   import IssueDetailsForm from './IssueDetailsForm.svelte';
   import SiteAccessForm from './SiteAccessForm.svelte';
   import CustomerInfoForm from './CustomerInfoForm.svelte';
@@ -21,7 +20,6 @@
   const stepLabels: Record<WizardStep, string> = {
     triage: 'Tell us what you need',
     'priority-upgrade': 'Choose your timing',
-    'warranty-detail': 'Tell us about the previous job',
     issue: "What's going on",
     site: 'Property & access',
     contact: 'Your contact info',
@@ -33,8 +31,6 @@
 
   function isStepValid(state: typeof $intakeStore): boolean {
     switch (state.step) {
-      case 'warranty-detail':
-        return !!state.warranty?.relatedJob.trim();
       case 'issue':
         return (
           state.issueDetails.serviceLocation.trim() !== '' &&
@@ -132,18 +128,12 @@
       <QuestionCard {node} onSelect={(option) => intakeStore.selectOption(option)} />
     {:else if state.step === 'priority-upgrade'}
       <PriorityUpgradeAsk />
-    {:else if state.step === 'warranty-detail' && state.warranty}
-      <header class="screen-head">
-        <h2>A few details about the previous job</h2>
-        <p>This helps us pull the right file before we come out.</p>
-      </header>
-      <WarrantyDetailForm value={state.warranty} showErrors={attempted} />
     {:else if state.step === 'issue'}
       <header class="screen-head">
         <h2>Tell us what's going on</h2>
         <p>Be as specific as you can — it helps us route the right person.</p>
       </header>
-      <IssueDetailsForm value={state.issueDetails} showErrors={attempted} />
+      <IssueDetailsForm value={state.issueDetails} job={state.selectedJobType} showErrors={attempted} />
     {:else if state.step === 'site'}
       <header class="screen-head">
         <h2>Property and access</h2>

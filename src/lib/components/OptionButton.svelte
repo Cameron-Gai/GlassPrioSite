@@ -18,7 +18,7 @@
 >
   {#if icon}
     <span class="icon" aria-hidden="true">
-      <ServiceIcon {icon} size={24} />
+      <ServiceIcon {icon} size={22} />
     </span>
   {/if}
   <span class="content">
@@ -27,24 +27,28 @@
       <span class="helper">{helperText}</span>
     {/if}
   </span>
-  <span class="chev" aria-hidden="true">→</span>
+  <span class="chev" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  </span>
 </button>
 
 <style>
   .option {
     display: flex;
     align-items: center;
-    gap: 0.85rem;
+    gap: 0.95rem;
     width: 100%;
-    padding: 0.9rem 1rem;
+    padding: 0.95rem 1.1rem;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--color-surface);
     box-shadow: var(--shadow-sm);
     text-align: left;
     color: var(--color-text);
-    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease,
-      background 0.15s ease;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease,
+      background 0.18s ease;
   }
 
   .option:hover:not(:disabled) {
@@ -61,13 +65,13 @@
 
   .option.emergency {
     border-color: var(--color-emergency-soft);
-    background: var(--color-emergency-bg);
-    color: #6b170b;
+    background: linear-gradient(180deg, #fff6f4 0%, #ffffff 70%);
+    color: #5b150a;
   }
 
   .option.emergency:hover:not(:disabled) {
     border-color: var(--color-emergency);
-    background: #fbdcd6;
+    background: linear-gradient(180deg, #ffe8e3 0%, #ffffff 70%);
   }
 
   .icon {
@@ -76,7 +80,7 @@
     justify-content: center;
     width: 40px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--color-primary-soft);
     color: var(--color-primary);
     flex-shrink: 0;
@@ -90,16 +94,17 @@
   .content {
     flex: 1;
     display: grid;
-    gap: 0.1rem;
+    gap: 0.15rem;
+    min-width: 0;
   }
 
   .label {
     font-weight: 600;
-    line-height: 1.2;
+    line-height: 1.25;
   }
 
   .helper {
-    font-size: 0.85rem;
+    font-size: 0.86rem;
     color: var(--color-muted);
   }
 
@@ -108,9 +113,9 @@
   }
 
   .chev {
-    font-size: 1.1rem;
+    display: inline-flex;
     color: var(--color-subtle);
-    transition: transform 0.15s ease, color 0.15s ease;
+    transition: transform 0.18s ease, color 0.18s ease;
   }
 
   .option:hover:not(:disabled) .chev {

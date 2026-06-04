@@ -17,7 +17,9 @@ export type ServiceIcon =
   | 'emergency-door'
   | 'emergency-storefront'
   | 'emergency-weather'
-  | 'safe';
+  | 'safe'
+  | 'yes'
+  | 'no';
 
 export interface TriageOption {
   id: string;
@@ -30,7 +32,7 @@ export interface TriageOption {
   isEmergency?: boolean;
 }
 
-export type LayoutHint = 'list' | 'cards';
+export type LayoutHint = 'list' | 'cards' | 'yesno';
 
 export interface TriageNode {
   id: string;
@@ -45,7 +47,30 @@ export const triageTree: Record<string, TriageNode> = {
     id: 'emergency',
     question: 'Is this an emergency or safety issue?',
     helperText:
-      "We prioritize urgent issues like broken glass, unsecured doors, or weather entering the building. We'll route you to a fast-response service if any of these apply.",
+      "Examples: broken glass, an unsecured door or window, weather entering the building, an unusable business entrance. If any of those apply, we'll route you to fast-response service.",
+    layout: 'yesno',
+    options: [
+      {
+        id: 'emergency-yes',
+        label: 'Yes — it’s urgent',
+        helperText: 'We’ll dispatch a same-day priority response',
+        icon: 'yes',
+        nextNodeId: 'emergency-which'
+      },
+      {
+        id: 'emergency-no',
+        label: 'No — not urgent',
+        helperText: 'Continue to the normal service request',
+        icon: 'no',
+        nextNodeId: 'service-category'
+      }
+    ]
+  },
+
+  'emergency-which': {
+    id: 'emergency-which',
+    question: 'Which best describes the emergency?',
+    helperText: "This helps the responder come prepared. We'll still treat it as urgent.",
     layout: 'list',
     options: [
       {
@@ -75,38 +100,6 @@ export const triageTree: Record<string, TriageNode> = {
         icon: 'emergency-weather',
         systemAction: 'checkBusinessHours',
         isEmergency: true
-      },
-      {
-        id: 'no-emergency',
-        label: 'None of these — this is not an emergency',
-        icon: 'safe',
-        nextNodeId: 'warranty'
-      }
-    ]
-  },
-
-  warranty: {
-    id: 'warranty',
-    question: 'Is this related to a previous job or warranty?',
-    helperText: 'Work we previously installed is covered under our warranty process.',
-    layout: 'list',
-    options: [
-      {
-        id: 'warranty-assessment',
-        label: 'Yes — please have a manager inspect it',
-        helperText: 'A manager will assess the issue and determine next steps.',
-        routeJobTypeName: 'Warranty Assessment'
-      },
-      {
-        id: 'warranty-repair',
-        label: 'Yes — I already know it needs repair',
-        helperText: "We'll schedule a return visit to repair the issue.",
-        routeJobTypeName: 'Warranty Repair'
-      },
-      {
-        id: 'warranty-none',
-        label: 'No — this is a new request',
-        nextNodeId: 'service-category'
       }
     ]
   },
@@ -127,7 +120,7 @@ export const triageTree: Record<string, TriageNode> = {
       {
         id: 'cat-window-frame',
         label: 'Window replacement',
-        helperText: 'Replacing window frames + glass',
+        helperText: 'New frames with glass',
         icon: 'window',
         nextNodeId: 'window-frames'
       },
@@ -168,15 +161,15 @@ export const triageTree: Record<string, TriageNode> = {
       },
       {
         id: 'cat-measurement',
-        label: 'Measurement only',
-        helperText: 'Document a measurement schedule',
+        label: 'Measurement requirements',
+        helperText: 'Critical measure or install checks',
         icon: 'measure',
-        nextNodeId: 'measurement'
+        routeJobTypeName: 'Critical - Measure and Installation Requirements'
       },
       {
         id: 'cat-other',
         label: 'Something else',
-        helperText: "We'll have a client manager review",
+        helperText: "A client manager will review",
         icon: 'other',
         routeJobTypeName: 'Other'
       }
@@ -186,7 +179,7 @@ export const triageTree: Record<string, TriageNode> = {
   'glass-panes': {
     id: 'glass-panes',
     question: 'How many panes or IG units need service?',
-    helperText: "An IG (insulated glass) unit counts as one pane.",
+    helperText: 'An IG (insulated glass) unit counts as one pane.',
     layout: 'list',
     options: [
       {
@@ -210,7 +203,7 @@ export const triageTree: Record<string, TriageNode> = {
   'window-frames': {
     id: 'window-frames',
     question: 'How many window frames need replacement?',
-    helperText: "If you're only replacing the glass (not the frame), go back and choose glass replacement.",
+    helperText: "If you're only replacing the glass (not the frame), go back and pick glass replacement.",
     layout: 'list',
     options: [
       {
@@ -233,9 +226,8 @@ export const triageTree: Record<string, TriageNode> = {
 
   storefront: {
     id: 'storefront',
-    question: 'What does the storefront / door system project involve?',
-    helperText:
-      "These services apply to both residential and commercial properties. They cover the full system — metal framing, doors, and glass.",
+    question: 'What does the project involve?',
+    helperText: 'These services cover residential and commercial — they all use the full storefront system (metal framing, doors, and glass).',
     layout: 'list',
     options: [
       {
@@ -247,12 +239,13 @@ export const triageTree: Record<string, TriageNode> = {
       {
         id: 'storefront-door',
         label: 'Replace or upgrade a door',
-        helperText: 'Entry door, side door, or office door',
+        helperText: 'Entry, side, or office door',
         routeJobTypeName: 'Storefront & Door Replacement - Consultation'
       },
       {
         id: 'storefront-framing',
-        label: 'Replace damaged framing or glass within a storefront',
+        label: 'Replace damaged framing or glass',
+        helperText: 'Within an existing storefront',
         routeJobTypeName: 'Storefront & Door Replacement - Consultation'
       }
     ]
@@ -304,7 +297,7 @@ export const triageTree: Record<string, TriageNode> = {
     id: 'shower-mirror',
     question: 'Shower glass, mirrors, or both?',
     helperText:
-      "These start with a virtual consultation — we'll review your photos and provide a rough estimate before any on-site visit.",
+      "We'll start with a virtual consultation. Photos help us provide a rough estimate before any on-site visit.",
     layout: 'list',
     options: [
       {
@@ -330,8 +323,7 @@ export const triageTree: Record<string, TriageNode> = {
   hardware: {
     id: 'hardware',
     question: 'Is the property residential or commercial?',
-    helperText:
-      "The process is the same for both — we just file the job under the right category.",
+    helperText: 'The process is the same for both — we just file the job under the right category.',
     layout: 'list',
     options: [
       {
@@ -369,31 +361,6 @@ export const triageTree: Record<string, TriageNode> = {
         nextNodeId: 'service-category'
       }
     ]
-  },
-
-  measurement: {
-    id: 'measurement',
-    question: 'What type of measurement do you need?',
-    layout: 'list',
-    options: [
-      {
-        id: 'measurement-ams',
-        label: 'AMS — full building window schedule',
-        helperText: 'We document every opening with photos and keep it on file.',
-        routeJobTypeName: 'Advanced Measurement System (AMS)'
-      },
-      {
-        id: 'measurement-critical',
-        label: 'Critical measurement / install requirement',
-        helperText: 'Specialized measurement or pre-install confirmation',
-        routeJobTypeName: 'Critical - Measure and Installation Requirements'
-      },
-      {
-        id: 'measurement-unsure',
-        label: "I'm not sure",
-        routeJobTypeName: 'Critical - Measure and Installation Requirements'
-      }
-    ]
   }
 };
 
@@ -421,7 +388,7 @@ export function getNode(nodeId: string): TriageNode {
 }
 
 /** Categories where we offer the Priority Service upsell after triage. */
-export const PRIORITY_UPGRADE_BLOCKED_CATEGORIES = new Set(['emergency', 'warranty', 'other']);
+export const PRIORITY_UPGRADE_BLOCKED_CATEGORIES = new Set(['emergency', 'other']);
 
 export function canUpgradeToPriority(jobType: JobType | null): boolean {
   if (!jobType) return false;

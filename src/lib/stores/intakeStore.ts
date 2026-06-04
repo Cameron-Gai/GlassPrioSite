@@ -12,6 +12,7 @@ import {
 import { getPublicJobType, type JobType } from '$lib/data/jobTypes';
 import type {
   AddressInfo,
+  CategoryDetails,
   CustomerInfo,
   IntakePayload,
   IssueDetails,
@@ -19,14 +20,12 @@ import type {
   PropertyType,
   SchedulingPreference,
   SelectedJobTypeSummary,
-  SpecialInstructions,
-  WarrantyInfo
+  SpecialInstructions
 } from '$lib/types/intake';
 
 export type WizardStep =
   | 'triage'
   | 'priority-upgrade'
-  | 'warranty-detail'
   | 'issue'
   | 'site'
   | 'contact'
@@ -51,7 +50,6 @@ export interface IntakeState {
   propertyType: PropertyType;
   issueDetails: IssueDetails;
   specialInstructions: SpecialInstructions;
-  warranty: WarrantyInfo | null;
   schedulingPreference: SchedulingPreference;
   confirmationNumber: string | null;
   submitting: boolean;
@@ -62,7 +60,6 @@ export interface IntakeState {
 export const STEP_ORDER: WizardStep[] = [
   'triage',
   'priority-upgrade',
-  'warranty-detail',
   'issue',
   'site',
   'contact',
@@ -79,7 +76,7 @@ export interface PhaseDef {
 }
 
 export const PHASES: PhaseDef[] = [
-  { id: 'tell-us', label: 'Tell us', steps: ['triage', 'priority-upgrade', 'warranty-detail'] },
+  { id: 'tell-us', label: 'Tell us', steps: ['triage', 'priority-upgrade'] },
   { id: 'details', label: 'Details', steps: ['issue', 'site'] },
   { id: 'you', label: 'You', steps: ['contact', 'address'] },
   { id: 'finish', label: 'Finish', steps: ['scheduling', 'review'] }
@@ -107,7 +104,15 @@ function initialState(): IntakeState {
       hasBrokenGlass: false,
       hasWaterOrWeatherEntry: false,
       ladder: { required: false, story: '' },
-      photos: []
+      photos: [],
+      categoryDetails: {
+        storefrontScope: '',
+        doorOperational: '',
+        showerMirrorType: '',
+        approximateSize: '',
+        hardwareProblem: '',
+        multiServiceList: ''
+      }
     },
     specialInstructions: {
       gateCode: '',
@@ -116,7 +121,6 @@ function initialState(): IntakeState {
       preferredWindow: '',
       other: ''
     },
-    warranty: null,
     schedulingPreference: '',
     confirmationNumber: null,
     submitting: false,
@@ -140,15 +144,8 @@ function applyEmergencyRoute(state: IntakeState): IntakeState {
   };
 }
 
-function isWarrantyRoute(jobName: string | undefined): boolean {
-  return jobName === 'Warranty Assessment' || jobName === 'Warranty Repair';
-}
-
 function postRouteStep(state: IntakeState): WizardStep {
   if (state.isEmergency) return 'issue';
-  if (state.warranty !== null || isWarrantyRoute(state.selectedJobType?.name)) {
-    return 'warranty-detail';
-  }
   if (canUpgradeToPriority(state.selectedJobType)) return 'priority-upgrade';
   return 'issue';
 }
@@ -180,10 +177,7 @@ function createIntakeStore() {
           originalJobType: route.jobType,
           isEmergency: route.isEmergency,
           isDuringBusinessHours: route.isEmergency ? isBusinessHours() : state.isDuringBusinessHours,
-          priorityUpgrade: false,
-          warranty: isWarrantyRoute(route.jobType.name)
-            ? { relatedJob: '', originalDate: '' }
-            : null
+          priorityUpgrade: false
         };
         return { ...next, step: postRouteStep(next) };
       }
@@ -234,9 +228,6 @@ function createIntakeStore() {
       if (nextStep === 'priority-upgrade' && !canUpgradeToPriority(state.selectedJobType)) {
         nextStep = STEP_ORDER[idx + 2] ?? nextStep;
       }
-      if (nextStep === 'warranty-detail' && state.warranty === null) {
-        nextStep = STEP_ORDER[STEP_ORDER.indexOf('warranty-detail') + 1] ?? nextStep;
-      }
       return { ...state, step: nextStep };
     });
   }
@@ -263,9 +254,6 @@ function createIntakeStore() {
         if (candidate === 'priority-upgrade' && !canUpgradeToPriority(state.selectedJobType)) {
           continue;
         }
-        if (candidate === 'warranty-detail' && state.warranty === null) {
-          continue;
-        }
         if (candidate === 'triage') {
           // Re-enter triage at the last decision; drop the route.
           const previous = state.triageHistory[state.triageHistory.length - 1] ?? TRIAGE_ROOT_ID;
@@ -280,8 +268,7 @@ function createIntakeStore() {
             selectedJobType: null,
             originalJobType: null,
             isEmergency: false,
-            priorityUpgrade: false,
-            warranty: null
+            priorityUpgrade: false
           };
         }
         return { ...state, step: candidate };
@@ -326,10 +313,13 @@ function createIntakeStore() {
     }));
   }
 
-  function updateWarranty(patch: Partial<WarrantyInfo>) {
+  function updateCategoryDetails(patch: Partial<CategoryDetails>) {
     store.update((state) => ({
       ...state,
-      warranty: state.warranty ? { ...state.warranty, ...patch } : { relatedJob: '', originalDate: '', ...patch }
+      issueDetails: {
+        ...state.issueDetails,
+        categoryDetails: { ...state.issueDetails.categoryDetails, ...patch }
+      }
     }));
   }
 
@@ -384,10 +374,10 @@ function createIntakeStore() {
       issueDetails: {
         ...state.issueDetails,
         ladder: { ...state.issueDetails.ladder },
-        photos: [...state.issueDetails.photos]
+        photos: [...state.issueDetails.photos],
+        categoryDetails: { ...state.issueDetails.categoryDetails }
       },
       specialInstructions: { ...state.specialInstructions },
-      warranty: state.warranty ? { ...state.warranty } : null,
       schedulingPreference: state.schedulingPreference,
       createdAt: new Date().toISOString()
     };
@@ -443,7 +433,7 @@ function createIntakeStore() {
     updateIssueDetails,
     updateLadder,
     updateSpecialInstructions,
-    updateWarranty,
+    updateCategoryDetails,
     addPhoto,
     removePhoto,
     setSchedulingPreference,

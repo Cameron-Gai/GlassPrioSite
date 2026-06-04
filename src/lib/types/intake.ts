@@ -43,9 +43,19 @@ export interface SpecialInstructions {
   other: string;
 }
 
-export interface WarrantyInfo {
-  relatedJob: string;
-  originalDate: string;
+export interface CategoryDetails {
+  /** Storefront only: what part is being replaced/upgraded. */
+  storefrontScope?: string;
+  /** Storefront only: is the door currently operational? */
+  doorOperational?: 'yes' | 'no' | 'unsure' | '';
+  /** Shower/mirror only: type wanted (frameless / semi / framed; wall / vanity / gym). */
+  showerMirrorType?: string;
+  /** Shower/mirror only: approximate size. */
+  approximateSize?: string;
+  /** Hardware only: a short description of the hardware problem. */
+  hardwareProblem?: string;
+  /** Multi-service only: services they want combined. */
+  multiServiceList?: string;
 }
 
 export interface IssueDetails {
@@ -57,6 +67,7 @@ export interface IssueDetails {
   hasWaterOrWeatherEntry: boolean;
   ladder: LadderInfo;
   photos: string[];
+  categoryDetails: CategoryDetails;
 }
 
 export interface SelectedJobTypeSummary {
@@ -84,7 +95,6 @@ export interface IntakePayload {
   answers: Record<string, string>;
   issueDetails: IssueDetails;
   specialInstructions: SpecialInstructions;
-  warranty: WarrantyInfo | null;
   schedulingPreference: SchedulingPreference;
   createdAt: string;
 }
