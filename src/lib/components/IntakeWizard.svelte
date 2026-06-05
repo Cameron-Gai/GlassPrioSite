@@ -178,23 +178,24 @@
     {/if}
   </div>
 
-  {#if state.step !== 'confirmation' && state.step !== 'priority-upgrade'}
-    <div class="actions" class:single={state.step === 'triage'}>
-      {#if state.step === 'triage'}
+  {#if state.step !== 'confirmation'}
+    {@const showSubmit = state.step === 'review'}
+    {@const showContinue = !['triage', 'priority-upgrade', 'review'].includes(state.step)}
+    {@const showActions = canGoBack || showSubmit || showContinue}
+    {#if showActions}
+      <div class="actions" class:back-only={canGoBack && !showSubmit && !showContinue}>
         {#if canGoBack}
           <button type="button" class="ghost" on:click={back}>Back</button>
         {/if}
-      {:else}
-        <button type="button" class="ghost" on:click={back} disabled={!canGoBack}>Back</button>
-        {#if state.step === 'review'}
+        {#if showSubmit}
           <button type="button" class="primary" on:click={submit} disabled={state.submitting}>
             {state.submitting ? 'Submitting…' : 'Submit request'}
           </button>
-        {:else}
+        {:else if showContinue}
           <button type="button" class="primary" on:click={next}>Continue</button>
         {/if}
-      {/if}
-    </div>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -248,7 +249,7 @@
     margin-top: 0.4rem;
   }
 
-  .actions.single {
+  .actions.back-only {
     justify-content: flex-start;
   }
 
@@ -288,7 +289,7 @@
     .actions {
       flex-direction: column-reverse;
     }
-    .actions.single {
+    .actions.back-only {
       flex-direction: row;
     }
     .primary,
