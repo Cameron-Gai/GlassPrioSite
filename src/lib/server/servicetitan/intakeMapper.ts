@@ -48,28 +48,9 @@ interface STCreateBookingRequest {
   campaignId?: number;
   jobTypeId?: number;
   bookingProviderId?: number;
-  /**
-   * Customer photos attached to the booking. EXACT FORMAT UNVERIFIED — the
-   * bookings POST contract for uploadedImages lives behind ServiceTitan's
-   * login-gated OpenAPI spec. Current best guess: an array of raw base64
-   * strings (no data: prefix). If the verify-first test booking shows photos
-   * not rendering, adjust `buildUploadedImages` below.
-   */
-  uploadedImages?: string[];
-}
-
-/**
- * Convert our data-URL photos to whatever the bookings API expects.
- * NOTE: format unverified — see uploadedImages above. Today we strip the
- * `data:image/...;base64,` prefix and send raw base64 strings.
- */
-function buildUploadedImages(payload: IntakePayload): string[] {
-  return payload.issueDetails.photos
-    .map((photo) => {
-      const comma = photo.dataUrl.indexOf(',');
-      return comma >= 0 ? photo.dataUrl.slice(comma + 1) : photo.dataUrl;
-    })
-    .filter((value) => value.length > 0);
+  // NOTE: no uploadedImages — verified live that the bookings POST stores the
+  // value as an opaque string the ST UI can't render (and no integration in
+  // the tenant uses it). Photos are self-hosted; their URLs go in `summary`.
 }
 
 interface STBookingResponse {
@@ -124,7 +105,7 @@ function toAscii(text: string): string {
     .replace(/[^\x20-\x7E\n]/g, '');
 }
 
-function buildBookingSummary(payload: IntakePayload): string {
+function buildBookingSummary(payload: IntakePayload, photoUrls: string[]): string {
   const lines: string[] = [];
   // ASCII only: ServiceTitan mangles non-ASCII (em-dashes etc.) into U+FFFD
   // on this endpoint, verified on live bookings.
@@ -183,8 +164,10 @@ function buildBookingSummary(payload: IntakePayload): string {
   if (payload.schedulingPreference) {
     lines.push(`Customer prefers: ${payload.schedulingPreference}`);
   }
-  if (payload.issueDetails.photos.length) {
-    lines.push(`${payload.issueDetails.photos.length} photo(s) attached to this booking.`);
+  if (photoUrls.length) {
+    lines.push('');
+    lines.push(`Customer photos (${photoUrls.length}):`);
+    for (const url of photoUrls) lines.push(`  ${url}`);
   }
   return toAscii(lines.join('\n'));
 }
@@ -196,21 +179,20 @@ export interface IntakeSubmissionResult {
 
 export async function submitIntakeToServiceTitan(
   config: ServiceTitanConfig,
-  payload: IntakePayload
+  payload: IntakePayload,
+  photoUrls: string[] = []
 ): Promise<IntakeSubmissionResult> {
-  // Web Crypto global (Node 19+) — avoids needing @types/node for node:crypto.
   const externalId = `glass-intake-${crypto.randomUUID()}`;
   const fullName = `${payload.customer.firstName} ${payload.customer.lastName}`.trim();
 
   // Optional jobTypeId pre-fill — the CSR confirms/overrides at conversion, so
   // a missing mapping is not a blocker in this flow.
   const resolution = resolveJobTypeId(payload.selectedJobType.name, config.jobTypeIdOverrides);
-  const uploadedImages = buildUploadedImages(payload);
 
   const booking: STCreateBookingRequest = {
     source: 'customer-intake-site',
     name: fullName || 'Web intake customer',
-    summary: buildBookingSummary(payload),
+    summary: buildBookingSummary(payload, photoUrls),
     address: buildAddress(payload),
     contacts: buildContacts(payload),
     customerType: inferCustomerType(payload),
@@ -221,8 +203,7 @@ export async function submitIntakeToServiceTitan(
     // confirmation email the office hasn't reviewed.
     isSendConfirmationEmail: false,
     ...(config.campaignId !== null ? { campaignId: config.campaignId } : {}),
-    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {}),
-    ...(uploadedImages.length ? { uploadedImages } : {})
+    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {})
   };
 
   // The exact route varies by tenant/API version (per the GlassReports guide):

@@ -6,6 +6,7 @@ import {
   ServiceTitanError,
   submitIntakeToServiceTitan
 } from '$lib/server/servicetitan';
+import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
@@ -56,7 +57,7 @@ function mockConfirmationNumber(): string {
   return `GLASS-${random}`;
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, url }) => {
   let payload: IntakePayload;
   try {
     payload = (await request.json()) as IntakePayload;
@@ -69,23 +70,36 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ success: false, error: validationError }, { status: 400 });
   }
 
+  // Persist photos to local storage (Railway volume in prod) and build the
+  // public URLs that go in the booking summary. Best-effort: a storage
+  // failure should not block the booking itself.
+  let photoUrls: string[] = [];
+  try {
+    const stored = await savePhotos(payload.issueDetails.photos, publicOrigin(url.origin));
+    photoUrls = stored.map((photo) => photo.url);
+  } catch (storageError) {
+    console.error('[api/intake] photo storage failed — continuing without links', storageError);
+  }
+
   const config = getServiceTitanConfig();
 
   if (!config) {
     // Dev / unconfigured: keep the mock path so the wizard works end-to-end.
     console.log('[api/intake] ServiceTitan not configured — returning mock confirmation', {
       jobType: payload.selectedJobType.name,
-      customer: `${payload.customer.firstName} ${payload.customer.lastName}`
+      customer: `${payload.customer.firstName} ${payload.customer.lastName}`,
+      photoUrls
     });
     return json({
       success: true,
       confirmationNumber: mockConfirmationNumber(),
-      mock: true
+      mock: true,
+      photoUrls
     });
   }
 
   try {
-    const result = await submitIntakeToServiceTitan(config, payload);
+    const result = await submitIntakeToServiceTitan(config, payload, photoUrls);
     console.log('[api/intake] ServiceTitan booking created', result);
     return json({
       success: true,
