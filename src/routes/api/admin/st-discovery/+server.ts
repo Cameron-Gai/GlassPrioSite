@@ -217,6 +217,7 @@ export const GET: RequestHandler = async ({ url }) => {
     // ── Detail for review ───────────────────────────────────────────────────
     jobTypeMatches: matchDetails,
     unmatchedIntakeJobTypes: unmatched,
+    allStJobTypes: stJobTypes.map((jt) => ({ id: jt.id, name: jt.name, active: jt.active ?? null })),
     allCampaigns: activeCampaigns,
     note:
       'Temporary helper. After copying values into Railway, unset ADMIN_DISCOVERY_TOKEN (or delete src/routes/api/admin/st-discovery).'
