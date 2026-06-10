@@ -1,5 +1,10 @@
 <script lang="ts">
+  import ServiceIcon from './ServiceIcon.svelte';
+  import type { ServiceIcon as IconKey } from '$lib/triage/triageTree';
+
   export let label: string;
+  export let helperText: string | undefined = undefined;
+  export let icon: IconKey | undefined = undefined;
   export let emphasis: 'default' | 'emergency' = 'default';
   export let disabled = false;
 </script>
@@ -11,15 +16,29 @@
   {disabled}
   on:click
 >
-  <span class="label">{label}</span>
-  <span class="chev" aria-hidden="true">›</span>
+  {#if icon}
+    <span class="icon" aria-hidden="true">
+      <ServiceIcon {icon} size={22} />
+    </span>
+  {/if}
+  <span class="content">
+    <span class="label">{label}</span>
+    {#if helperText}
+      <span class="helper">{helperText}</span>
+    {/if}
+  </span>
+  <span class="chev" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  </span>
 </button>
 
 <style>
   .option {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 0.95rem;
     width: 100%;
     padding: 0.95rem 1.1rem;
     border: 1px solid var(--color-border);
@@ -27,10 +46,9 @@
     background: var(--color-surface);
     box-shadow: var(--shadow-sm);
     text-align: left;
-    font-weight: 600;
     color: var(--color-text);
-    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease,
-      background 0.15s ease;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease,
+      background 0.18s ease;
   }
 
   .option:hover:not(:disabled) {
@@ -39,25 +57,70 @@
     box-shadow: var(--shadow-md);
   }
 
+  .option:focus-visible {
+    outline: none;
+    box-shadow: var(--ring-focus);
+    border-color: var(--color-primary);
+  }
+
   .option.emergency {
-    border-color: var(--color-emergency);
-    background: var(--color-emergency-bg);
-    color: #7a1d12;
+    border-color: var(--color-emergency-soft);
+    background: linear-gradient(180deg, #fff6f4 0%, #ffffff 70%);
+    color: #5b150a;
   }
 
   .option.emergency:hover:not(:disabled) {
-    background: #fbdcd6;
+    border-color: var(--color-emergency);
+    background: linear-gradient(180deg, #ffe8e3 0%, #ffffff 70%);
+  }
+
+  .icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  .option.emergency .icon {
+    background: rgba(192, 57, 43, 0.12);
+    color: var(--color-emergency);
+  }
+
+  .content {
+    flex: 1;
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
   }
 
   .label {
-    flex: 1;
-    padding-right: 0.5rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .helper {
+    font-size: 0.86rem;
+    color: var(--color-muted);
+  }
+
+  .option.emergency .helper {
+    color: #834035;
   }
 
   .chev {
-    font-size: 1.4rem;
-    line-height: 1;
-    color: var(--color-muted);
+    display: inline-flex;
+    color: var(--color-subtle);
+    transition: transform 0.18s ease, color 0.18s ease;
+  }
+
+  .option:hover:not(:disabled) .chev {
+    color: var(--color-primary);
+    transform: translateX(2px);
   }
 
   .option.emergency .chev {

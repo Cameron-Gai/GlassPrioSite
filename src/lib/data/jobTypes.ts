@@ -1,5 +1,16 @@
 export type JobPriority = 'Urgent' | 'High' | 'Normal' | 'Low';
 
+export type ConsultationFormat = 'on-site' | 'virtual' | 'none';
+
+export interface PricingInfo {
+  /** Short customer-facing price line, e.g. "$45 trip charge" or "Free consultation". */
+  display: string;
+  /** Longer explanation of what the fee covers and how it applies. */
+  detail?: string;
+  /** Optional rebate / credit shown as a positive callout. */
+  rebate?: string;
+}
+
 export interface JobType {
   name: string;
   priority: JobPriority;
@@ -7,16 +18,25 @@ export interface JobType {
   category: string;
   customerFacing: boolean;
   publicIntakeEnabled: boolean;
+  /** Short, plain-language label shown to the customer (no internal jargon). */
+  customerLabel?: string;
+  /** One-line summary of what we'll do. */
+  summary?: string;
+  /** Bullet points of what's included / what to expect. */
+  includes?: string[];
+  pricing?: PricingInfo;
+  consultationFormat?: ConsultationFormat;
 }
 
 export const jobTypes: JobType[] = [
   {
+    // Booked internally by a client manager — not exposed in public intake.
     name: 'Advanced Measurement System (AMS)',
     priority: 'High',
     duration: '2 hours',
     category: 'measurement',
-    customerFacing: true,
-    publicIntakeEnabled: true
+    customerFacing: false,
+    publicIntakeEnabled: false
   },
   {
     name: 'Critical - Measure and Installation Requirements',
@@ -24,7 +44,12 @@ export const jobTypes: JobType[] = [
     duration: '1 hour',
     category: 'measurement',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Critical Measurement / Install Requirements',
+    summary:
+      'For specialized measurement or pre-install requirements that need a technician on-site to confirm.',
+    pricing: { display: 'Quoted on-site' },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Custom Shower Enclosure Or Mirrors - Consultation',
@@ -32,7 +57,21 @@ export const jobTypes: JobType[] = [
     duration: '45 minutes',
     category: 'shower-mirror',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Custom Shower or Mirror — Virtual Consultation',
+    summary:
+      "We start with a virtual consultation using your photos. For showers, we finalize once your tile work is complete.",
+    includes: [
+      'Virtual consultation reviewing your photos',
+      'Rough estimate provided remotely',
+      'On-site critical measurement once accepted'
+    ],
+    pricing: {
+      display: '$125 deposit on acceptance',
+      detail:
+        'A $125 non-refundable deposit is collected when you accept the rough estimate. It is applied toward the final invoice.'
+    },
+    consultationFormat: 'virtual'
   },
   {
     name: 'Custom Shower Enclosure Or Mirrors - Installation',
@@ -48,7 +87,16 @@ export const jobTypes: JobType[] = [
     duration: '2 hours',
     category: 'emergency',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Emergency Service — After Hours',
+    summary: 'A professional on-site within 3 hours, after business hours.',
+    includes: [
+      'Up to 1 hour of on-site labor',
+      'Materials for one standard board-up',
+      'Cleanup of broken glass and debris',
+      'Additional work quoted and approved before starting'
+    ],
+    pricing: { display: '$575' }
   },
   {
     name: 'Glass Replacement (1-4 Panes) - Consultation',
@@ -56,7 +104,17 @@ export const jobTypes: JobType[] = [
     duration: '30 minutes',
     category: 'glass-replacement',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Glass Replacement (1–4 panes) — Consultation',
+    summary: 'On-site assessment and quote for replacing one to four panes / IG units.',
+    includes: ['On-site assessment', 'Measurements taken', 'Written quote provided'],
+    pricing: {
+      display: '$45 trip charge',
+      detail:
+        'Waived if you are in Zone 1. Credited toward the repair when you proceed.',
+      rebate: 'Credited toward repair'
+    },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Glass Replacement (1-4 Panes) - Installation',
@@ -72,7 +130,15 @@ export const jobTypes: JobType[] = [
     duration: '1 hour',
     category: 'glass-replacement',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Glass Replacement (5+ panes) — Consultation',
+    summary: 'On-site assessment and quote for replacing five or more panes / IG units.',
+    includes: ['On-site assessment', 'Measurements for all panes', 'Written quote provided'],
+    pricing: {
+      display: 'Free consultation',
+      detail: 'Free except in Zone 3.'
+    },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Glass Replacement (5+ Panes) - Installation',
@@ -88,7 +154,22 @@ export const jobTypes: JobType[] = [
     duration: '1 hour 30 minutes',
     category: 'hardware',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Hardware Service — Commercial',
+    summary:
+      'Assessment and diagnostic for commercial window or door hardware. The $350 fee covers the first hour of work.',
+    includes: [
+      'Diagnostic and assessment',
+      'First hour of labor',
+      'Proposal for any additional parts or labor'
+    ],
+    pricing: {
+      display: '$350',
+      detail:
+        'Covers diagnostic + first hour. If we can’t offer a solution, only the $125 site assessment fee applies.',
+      rebate: 'Applied toward the repair'
+    },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Hardware Service Consultation - Residential',
@@ -96,7 +177,22 @@ export const jobTypes: JobType[] = [
     duration: '1 hour 30 minutes',
     category: 'hardware',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Hardware Service — Residential',
+    summary:
+      'Assessment and diagnostic for residential window or door hardware. The $350 fee covers the first hour of work.',
+    includes: [
+      'Diagnostic and assessment',
+      'First hour of labor',
+      'Proposal for any additional parts or labor'
+    ],
+    pricing: {
+      display: '$350',
+      detail:
+        'Covers diagnostic + first hour. If we can’t offer a solution, only the $125 site assessment fee applies.',
+      rebate: 'Applied toward the repair'
+    },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Multiservice Consultation',
@@ -104,7 +200,12 @@ export const jobTypes: JobType[] = [
     duration: '1 hour 30 minutes',
     category: 'multiservice',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Multi-Service Consultation',
+    summary: 'A single appointment that reviews several different services for your property.',
+    includes: ['Review of each service requested', 'Combined measurements and quote'],
+    pricing: { display: 'Quoted on-site' },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Multiservice Installation',
@@ -128,7 +229,12 @@ export const jobTypes: JobType[] = [
     duration: '45 minutes',
     category: 'window-replacement',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Window Replacement (1–2 frames) — Consultation',
+    summary: 'On-site assessment and quote for replacing one or two window frames with new glass.',
+    includes: ['Frame and glass assessment', 'Measurements', 'Written quote'],
+    pricing: { display: 'Free consultation' },
+    consultationFormat: 'on-site'
   },
   {
     name: 'New Window Replacement (1-2 Frames) - Installation',
@@ -144,7 +250,12 @@ export const jobTypes: JobType[] = [
     duration: '1 hour',
     category: 'window-replacement',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Window Replacement (3+ frames) — Consultation',
+    summary: 'On-site assessment and quote for replacing three or more window frames with new glass.',
+    includes: ['Frame and glass assessment for each opening', 'Measurements', 'Written quote'],
+    pricing: { display: 'Free consultation' },
+    consultationFormat: 'on-site'
   },
   {
     name: 'New Window Replacement (3+ Frames) - Installation',
@@ -160,7 +271,16 @@ export const jobTypes: JobType[] = [
     duration: '15 minutes',
     category: 'other',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Other request — Client manager review',
+    summary:
+      'For requests outside our standard services (such as shop fabrication or carryout). A client manager will review and follow up.',
+    includes: [
+      'Reviewed by a client manager',
+      'You’ll hear back about whether we send a consultant, quote remotely, or refer you elsewhere'
+    ],
+    pricing: { display: 'No charge to submit' },
+    consultationFormat: 'none'
   },
   {
     name: 'Patio and Pet Door - Consultation',
@@ -168,7 +288,12 @@ export const jobTypes: JobType[] = [
     duration: '30 minutes',
     category: 'patio-pet-door',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Patio or Pet Door — Consultation',
+    summary: 'On-site assessment and quote for patio or pet door installation or repair.',
+    includes: ['On-site assessment', 'Measurements', 'Written quote'],
+    pricing: { display: 'Quoted on-site' },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Patio and Pet Door - Installation',
@@ -184,7 +309,18 @@ export const jobTypes: JobType[] = [
     duration: '2 hours',
     category: 'emergency',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Priority Service — Business Hours',
+    summary: 'A professional on-site within 2 hours during business hours.',
+    includes: [
+      'Up to 1 hour of on-site labor',
+      'Materials for one standard board-up',
+      'Cleanup of broken glass and debris'
+    ],
+    pricing: {
+      display: '$399',
+      rebate: '$199 rebate if you proceed with the repair'
+    }
   },
   {
     name: 'Storefront & Door Replacement - Consultation',
@@ -192,7 +328,17 @@ export const jobTypes: JobType[] = [
     duration: '45 minutes',
     category: 'storefront-door',
     customerFacing: true,
-    publicIntakeEnabled: true
+    publicIntakeEnabled: true,
+    customerLabel: 'Storefront / Door System — Consultation',
+    summary:
+      'Replacement of a storefront system: new metal framing, doors, and glass. (Applies to residential properties too.)',
+    includes: [
+      'On-site assessment of framing, doors, and glass',
+      'Measurements',
+      'Written quote'
+    ],
+    pricing: { display: 'Quoted on-site' },
+    consultationFormat: 'on-site'
   },
   {
     name: 'Storefront & Door Replacement - Installation',
@@ -203,20 +349,21 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: false
   },
   {
+    // Warranty work is handled outside of the public intake site.
     name: 'Warranty Assessment',
     priority: 'Urgent',
     duration: '2 hours',
     category: 'warranty',
-    customerFacing: true,
-    publicIntakeEnabled: true
+    customerFacing: false,
+    publicIntakeEnabled: false
   },
   {
     name: 'Warranty Repair',
     priority: 'Urgent',
     duration: '2 hours',
     category: 'warranty',
-    customerFacing: true,
-    publicIntakeEnabled: true
+    customerFacing: false,
+    publicIntakeEnabled: false
   }
 ];
 

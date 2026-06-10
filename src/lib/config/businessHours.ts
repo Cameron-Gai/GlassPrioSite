@@ -15,14 +15,14 @@ export interface BusinessHoursConfig {
 }
 
 export const businessHours: BusinessHoursConfig = {
-  timezone: 'America/Chicago',
+  timezone: 'America/Los_Angeles',
   days: {
     monday: { open: '08:00', close: '17:00' },
     tuesday: { open: '08:00', close: '17:00' },
     wednesday: { open: '08:00', close: '17:00' },
     thursday: { open: '08:00', close: '17:00' },
     friday: { open: '08:00', close: '17:00' },
-    saturday: null,
+    saturday: { open: '08:00', close: '17:00' },
     sunday: null
   }
 };

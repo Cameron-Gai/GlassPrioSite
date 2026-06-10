@@ -3,20 +3,42 @@ import { getPublicJobType } from '$lib/data/jobTypes';
 
 export type SystemAction = 'checkBusinessHours';
 
+export type ServiceIcon =
+  | 'glass'
+  | 'window'
+  | 'storefront'
+  | 'patio'
+  | 'shower'
+  | 'hardware'
+  | 'multi'
+  | 'measure'
+  | 'other'
+  | 'emergency-glass'
+  | 'emergency-door'
+  | 'emergency-storefront'
+  | 'emergency-weather'
+  | 'safe'
+  | 'yes'
+  | 'no';
+
 export interface TriageOption {
   id: string;
   label: string;
   helperText?: string;
+  icon?: ServiceIcon;
   nextNodeId?: string;
   routeJobTypeName?: string;
   systemAction?: SystemAction;
   isEmergency?: boolean;
 }
 
+export type LayoutHint = 'list' | 'cards' | 'yesno';
+
 export interface TriageNode {
   id: string;
   question: string;
   helperText?: string;
+  layout?: LayoutHint;
   options: TriageOption[];
 }
 
@@ -25,58 +47,59 @@ export const triageTree: Record<string, TriageNode> = {
     id: 'emergency',
     question: 'Is this an emergency or safety issue?',
     helperText:
-      'This helps us prioritize urgent issues like broken glass, unsecured doors, or weather entering the building.',
+      "Examples: broken glass, an unsecured door or window, weather entering the building, an unusable business entrance. If any of those apply, we'll route you to fast-response service.",
+    layout: 'yesno',
+    options: [
+      {
+        id: 'emergency-yes',
+        label: 'Yes — it’s urgent',
+        helperText: 'We’ll dispatch a same-day priority response',
+        icon: 'yes',
+        nextNodeId: 'emergency-which'
+      },
+      {
+        id: 'emergency-no',
+        label: 'No — not urgent',
+        helperText: 'Continue to the normal service request',
+        icon: 'no',
+        nextNodeId: 'service-category'
+      }
+    ]
+  },
+
+  'emergency-which': {
+    id: 'emergency-which',
+    question: 'Which best describes the emergency?',
+    helperText: "This helps the responder come prepared. We'll still treat it as urgent.",
+    layout: 'list',
     options: [
       {
         id: 'emergency-broken-glass',
         label: 'Broken glass creating a safety hazard',
+        icon: 'emergency-glass',
         systemAction: 'checkBusinessHours',
         isEmergency: true
       },
       {
         id: 'emergency-unsecure',
-        label: 'Door or window cannot secure the building',
+        label: 'A door or window cannot secure the building',
+        icon: 'emergency-door',
         systemAction: 'checkBusinessHours',
         isEmergency: true
       },
       {
         id: 'emergency-business-entrance',
-        label: 'Business entrance is unusable',
+        label: 'A business entrance is unusable',
+        icon: 'emergency-storefront',
         systemAction: 'checkBusinessHours',
         isEmergency: true
       },
       {
         id: 'emergency-weather',
         label: 'Water or weather is entering the property',
+        icon: 'emergency-weather',
         systemAction: 'checkBusinessHours',
         isEmergency: true
-      },
-      {
-        id: 'no-emergency',
-        label: 'This is not an emergency',
-        nextNodeId: 'warranty'
-      }
-    ]
-  },
-
-  warranty: {
-    id: 'warranty',
-    question: 'Is this related to a previous job or warranty?',
-    options: [
-      {
-        id: 'warranty-assessment',
-        label: 'Yes, I need someone to inspect the issue',
-        routeJobTypeName: 'Warranty Assessment'
-      },
-      {
-        id: 'warranty-repair',
-        label: 'Yes, I already know it needs repair',
-        routeJobTypeName: 'Warranty Repair'
-      },
-      {
-        id: 'warranty-none',
-        label: 'No',
-        nextNodeId: 'service-category'
       }
     ]
   },
@@ -84,50 +107,70 @@ export const triageTree: Record<string, TriageNode> = {
   'service-category': {
     id: 'service-category',
     question: 'What do you need help with?',
+    helperText: "Pick the closest match — we'll fine-tune the details next.",
+    layout: 'cards',
     options: [
       {
         id: 'cat-glass',
-        label: 'Broken or fogged glass pane replacement',
+        label: 'Glass replacement',
+        helperText: 'Broken or fogged pane / IG unit',
+        icon: 'glass',
         nextNodeId: 'glass-panes'
       },
       {
         id: 'cat-window-frame',
-        label: 'Window frame replacement',
+        label: 'Window replacement',
+        helperText: 'New frames with glass',
+        icon: 'window',
         nextNodeId: 'window-frames'
       },
       {
         id: 'cat-storefront',
-        label: 'Storefront or commercial door',
+        label: 'Storefront or door system',
+        helperText: 'Metal framing, doors, and glass',
+        icon: 'storefront',
         nextNodeId: 'storefront'
       },
       {
         id: 'cat-patio-pet',
-        label: 'Patio door or pet door',
-        nextNodeId: 'patio-pet'
+        label: 'Patio or pet door',
+        helperText: 'Sliding doors, pet doors',
+        icon: 'patio',
+        nextNodeId: 'patio-pet-scope'
       },
       {
         id: 'cat-shower-mirror',
         label: 'Shower glass or mirrors',
+        helperText: 'Custom enclosures and mirrors',
+        icon: 'shower',
         nextNodeId: 'shower-mirror'
       },
       {
         id: 'cat-hardware',
         label: 'Door or window hardware',
+        helperText: 'Locks, hinges, rollers, closers',
+        icon: 'hardware',
         nextNodeId: 'hardware'
       },
       {
         id: 'cat-multiservice',
         label: 'Multiple services',
+        helperText: 'More than one of the above',
+        icon: 'multi',
         nextNodeId: 'multiservice'
       },
       {
         id: 'cat-measurement',
-        label: 'Measurement or install requirements',
-        nextNodeId: 'measurement'
+        label: 'Measurement requirements',
+        helperText: 'Critical measure or install checks',
+        icon: 'measure',
+        routeJobTypeName: 'Critical - Measure and Installation Requirements'
       },
       {
         id: 'cat-other',
         label: 'Something else',
+        helperText: "A client manager will review",
+        icon: 'other',
         routeJobTypeName: 'Other'
       }
     ]
@@ -135,7 +178,9 @@ export const triageTree: Record<string, TriageNode> = {
 
   'glass-panes': {
     id: 'glass-panes',
-    question: 'How many panes need service?',
+    question: 'How many panes or IG units need service?',
+    helperText: 'An IG (insulated glass) unit counts as one pane.',
+    layout: 'list',
     options: [
       {
         id: 'glass-1-4',
@@ -144,7 +189,7 @@ export const triageTree: Record<string, TriageNode> = {
       },
       {
         id: 'glass-5-plus',
-        label: '5+ panes',
+        label: '5 or more panes',
         routeJobTypeName: 'Glass Replacement (5+ Panes) - Consultation'
       },
       {
@@ -158,6 +203,8 @@ export const triageTree: Record<string, TriageNode> = {
   'window-frames': {
     id: 'window-frames',
     question: 'How many window frames need replacement?',
+    helperText: "If you're only replacing the glass (not the frame), go back and pick glass replacement.",
+    layout: 'list',
     options: [
       {
         id: 'window-1-2',
@@ -166,7 +213,7 @@ export const triageTree: Record<string, TriageNode> = {
       },
       {
         id: 'window-3-plus',
-        label: '3+ frames',
+        label: '3 or more frames',
         routeJobTypeName: 'New Window Replacement (3+ Frames) - Consultation'
       },
       {
@@ -179,24 +226,54 @@ export const triageTree: Record<string, TriageNode> = {
 
   storefront: {
     id: 'storefront',
-    question: 'Is this for a business, storefront, or commercial entry?',
+    question: 'What does the project involve?',
+    helperText: 'These services cover residential and commercial — they all use the full storefront system (metal framing, doors, and glass).',
+    layout: 'list',
     options: [
       {
-        id: 'storefront-yes',
-        label: 'Yes',
+        id: 'storefront-full',
+        label: 'Replace the full storefront system',
+        helperText: 'Metal framing + doors + glass',
         routeJobTypeName: 'Storefront & Door Replacement - Consultation'
       },
       {
-        id: 'storefront-no',
-        label: "No / I'm not sure",
+        id: 'storefront-door',
+        label: 'Replace or upgrade a door',
+        helperText: 'Entry, side, or office door',
         routeJobTypeName: 'Storefront & Door Replacement - Consultation'
+      },
+      {
+        id: 'storefront-framing',
+        label: 'Replace damaged framing or glass',
+        helperText: 'Within an existing storefront',
+        routeJobTypeName: 'Storefront & Door Replacement - Consultation'
+      }
+    ]
+  },
+
+  'patio-pet-scope': {
+    id: 'patio-pet-scope',
+    question: 'Is this glass-only, or does the door itself need work?',
+    helperText: 'If only the glass needs replacing, we route it through Glass Replacement instead.',
+    layout: 'list',
+    options: [
+      {
+        id: 'patio-pet-glass-only',
+        label: 'Just the glass needs replacing',
+        nextNodeId: 'glass-panes'
+      },
+      {
+        id: 'patio-pet-door',
+        label: 'The door itself needs install or repair',
+        nextNodeId: 'patio-pet'
       }
     ]
   },
 
   'patio-pet': {
     id: 'patio-pet',
-    question: 'What type of door do you need help with?',
+    question: 'Which type of door?',
+    layout: 'list',
     options: [
       {
         id: 'patio-only',
@@ -218,16 +295,21 @@ export const triageTree: Record<string, TriageNode> = {
 
   'shower-mirror': {
     id: 'shower-mirror',
-    question: 'What do you need help with?',
+    question: 'Shower glass, mirrors, or both?',
+    helperText:
+      "We'll start with a virtual consultation. Photos help us provide a rough estimate before any on-site visit.",
+    layout: 'list',
     options: [
       {
         id: 'shower-only',
         label: 'Shower glass',
+        helperText: 'Frameless, semi-frameless, or framed',
         routeJobTypeName: 'Custom Shower Enclosure Or Mirrors - Consultation'
       },
       {
         id: 'mirror-only',
         label: 'Mirror',
+        helperText: 'Wall, vanity, or gym mirror',
         routeJobTypeName: 'Custom Shower Enclosure Or Mirrors - Consultation'
       },
       {
@@ -240,7 +322,9 @@ export const triageTree: Record<string, TriageNode> = {
 
   hardware: {
     id: 'hardware',
-    question: 'Is this residential or commercial?',
+    question: 'Is the property residential or commercial?',
+    helperText: 'The process is the same for both — we just file the job under the right category.',
+    layout: 'list',
     options: [
       {
         id: 'hardware-residential',
@@ -262,39 +346,19 @@ export const triageTree: Record<string, TriageNode> = {
 
   multiservice: {
     id: 'multiservice',
-    question: 'Do you need help with more than one type of glass, window, door, or hardware issue?',
+    question: 'You need help with more than one service?',
+    helperText: "We'll review all of them in a single appointment.",
+    layout: 'list',
     options: [
       {
         id: 'multiservice-yes',
-        label: 'Yes',
+        label: 'Yes — combine them into one visit',
         routeJobTypeName: 'Multiservice Consultation'
       },
       {
         id: 'multiservice-no',
-        label: "No / I'm not sure",
+        label: 'Actually, just one service',
         nextNodeId: 'service-category'
-      }
-    ]
-  },
-
-  measurement: {
-    id: 'measurement',
-    question: 'What type of measurement help is needed?',
-    options: [
-      {
-        id: 'measurement-ams',
-        label: 'Advanced measurement system',
-        routeJobTypeName: 'Advanced Measurement System (AMS)'
-      },
-      {
-        id: 'measurement-critical',
-        label: 'Critical measurement or installation requirement',
-        routeJobTypeName: 'Critical - Measure and Installation Requirements'
-      },
-      {
-        id: 'measurement-unsure',
-        label: "I'm not sure",
-        routeJobTypeName: 'Critical - Measure and Installation Requirements'
       }
     ]
   }
@@ -307,11 +371,6 @@ export interface TriageRoute {
   isEmergency: boolean;
 }
 
-/**
- * Resolve the public-facing job type for a given option. Throws if the
- * referenced job type is missing or not public-intake enabled, which would
- * indicate a misconfigured tree.
- */
 export function resolveRoute(option: TriageOption): TriageRoute | null {
   if (!option.routeJobTypeName) return null;
   return {
@@ -326,4 +385,12 @@ export function getNode(nodeId: string): TriageNode {
     throw new Error(`Unknown triage node: ${nodeId}`);
   }
   return node;
+}
+
+/** Categories where we offer the Priority Service upsell after triage. */
+export const PRIORITY_UPGRADE_BLOCKED_CATEGORIES = new Set(['emergency', 'other']);
+
+export function canUpgradeToPriority(jobType: JobType | null): boolean {
+  if (!jobType) return false;
+  return !PRIORITY_UPGRADE_BLOCKED_CATEGORIES.has(jobType.category);
 }

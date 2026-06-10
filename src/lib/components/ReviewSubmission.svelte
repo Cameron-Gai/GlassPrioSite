@@ -1,65 +1,69 @@
 <script lang="ts">
-  import PriorityBadge from './PriorityBadge.svelte';
+  import JobTypeBanner from './JobTypeBanner.svelte';
   import type { IntakeState } from '$lib/stores/intakeStore';
 
   export let state: IntakeState;
 </script>
 
-<div class="review">
+<div class="review fade-in">
+  {#if state.selectedJobType}
+    <JobTypeBanner
+      job={state.selectedJobType}
+      isEmergency={state.isEmergency}
+      isDuringBusinessHours={state.isDuringBusinessHours}
+      priorityUpgrade={state.priorityUpgrade}
+    />
+  {/if}
+
   <section class="block">
-    <h3>Service summary</h3>
+    <h3>What's going on</h3>
     <dl>
-      <div>
-        <dt>Selected service</dt>
-        <dd>{state.selectedJobType?.name ?? '—'}</dd>
+      <div><dt>Location</dt><dd>{state.issueDetails.serviceLocation || '—'}</dd></div>
+      <div><dt>When</dt><dd>{state.issueDetails.happenedAt || '—'}</dd></div>
+      <div class="full">
+        <dt>Description</dt>
+        <dd class="multiline">{state.issueDetails.description || '—'}</dd>
       </div>
       <div>
-        <dt>Priority</dt>
+        <dt>Ladder</dt>
         <dd>
-          <PriorityBadge priority={state.selectedJobType?.priority ?? ''} />
+          {state.issueDetails.ladder.required
+            ? `Yes — ${state.issueDetails.ladder.story || 'height not noted'}`
+            : 'Not required'}
         </dd>
       </div>
       <div>
-        <dt>Estimated duration</dt>
-        <dd>{state.selectedJobType?.duration ?? '—'}</dd>
+        <dt>Site</dt>
+        <dd>
+          {state.issueDetails.isSecure ? 'Secure' : 'Not secure'}
+          {state.issueDetails.hasBrokenGlass ? ' · Broken glass on site' : ''}
+          {state.issueDetails.hasWaterOrWeatherEntry ? ' · Weather entering' : ''}
+        </dd>
       </div>
-      {#if state.isEmergency}
-        <div>
-          <dt>Business hours</dt>
-          <dd>
-            {state.isDuringBusinessHours
-              ? 'Currently within business hours'
-              : 'Currently outside business hours'}
-          </dd>
-        </div>
+    </dl>
+  </section>
+
+  <section class="block">
+    <h3>Property & access</h3>
+    <dl>
+      <div><dt>Property type</dt><dd>{state.propertyType || '—'}</dd></div>
+      <div><dt>Gate code</dt><dd>{state.specialInstructions.gateCode || '—'}</dd></div>
+      <div>
+        <dt>Dog on site</dt>
+        <dd>{state.specialInstructions.hasDog ? 'Yes' : 'No'}</dd>
+      </div>
+      <div><dt>Parking</dt><dd>{state.specialInstructions.parkingNotes || '—'}</dd></div>
+      <div><dt>Preferred window</dt><dd>{state.specialInstructions.preferredWindow || '—'}</dd></div>
+      {#if state.specialInstructions.other}
+        <div class="full"><dt>Notes</dt><dd class="multiline">{state.specialInstructions.other}</dd></div>
       {/if}
     </dl>
   </section>
 
   <section class="block">
-    <h3>Issue</h3>
-    <p class="multiline">{state.issueDetails.description || '—'}</p>
-    <ul class="facts">
-      <li><strong>When:</strong> {state.issueDetails.happenedAt || '—'}</li>
-      <li><strong>Property type:</strong> {state.propertyType || '—'}</li>
-      <li>
-        <strong>Opening secure:</strong> {state.issueDetails.isSecure ? 'Yes' : 'No'}
-      </li>
-      <li>
-        <strong>Broken glass on site:</strong> {state.issueDetails.hasBrokenGlass ? 'Yes' : 'No'}
-      </li>
-      <li>
-        <strong>Water / weather entry:</strong>
-        {state.issueDetails.hasWaterOrWeatherEntry ? 'Yes' : 'No'}
-      </li>
-    </ul>
-  </section>
-
-  <section class="block">
     <h3>Contact</h3>
     <p>
-      {state.customer.firstName}
-      {state.customer.lastName}<br />
+      {state.customer.firstName} {state.customer.lastName}<br />
       {state.customer.phone}<br />
       {state.customer.email}
     </p>
@@ -69,8 +73,7 @@
     <h3>Service address</h3>
     <p>
       {state.address.street}<br />
-      {state.address.city}, {state.address.state}
-      {state.address.zip}
+      {state.address.city}, {state.address.state} {state.address.zip}
     </p>
   </section>
 
@@ -81,11 +84,11 @@
 
   <section class="block">
     <h3>Photos</h3>
-    {#if state.uploadedPhotos.length === 0}
+    {#if state.issueDetails.photos.length === 0}
       <p class="muted">No photos uploaded.</p>
     {:else}
       <ul class="photos">
-        {#each state.uploadedPhotos as photo (photo)}
+        {#each state.issueDetails.photos as photo (photo)}
           <li>{photo}</li>
         {/each}
       </ul>
@@ -96,22 +99,23 @@
 <style>
   .review {
     display: grid;
-    gap: 1rem;
+    gap: 0.85rem;
   }
 
   .block {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: 0.9rem 1rem;
+    padding: 0.95rem 1rem;
   }
 
   h3 {
-    margin: 0 0 0.5rem;
-    font-size: 0.95rem;
+    margin: 0 0 0.6rem;
+    font-size: 0.78rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     color: var(--color-muted);
+    font-weight: 700;
   }
 
   dl {
@@ -122,39 +126,27 @@
 
   dl div {
     display: grid;
-    grid-template-columns: 1fr 1.5fr;
+    grid-template-columns: 1fr 1.6fr;
     gap: 0.5rem;
-    align-items: center;
+    align-items: start;
+  }
+
+  dl div.full {
+    grid-template-columns: 1fr;
   }
 
   dt {
     color: var(--color-muted);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   .multiline {
     white-space: pre-wrap;
-    margin: 0 0 0.5rem;
-  }
-
-  .facts {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: grid;
-    gap: 0.3rem;
-    color: var(--color-text);
-    font-size: 0.95rem;
-  }
-
-  .photos {
-    margin: 0;
-    padding-left: 1.1rem;
   }
 
   .muted {
@@ -162,9 +154,17 @@
     margin: 0;
   }
 
+  .photos {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+
   @media (max-width: 520px) {
     dl div {
       grid-template-columns: 1fr;
+    }
+    dt {
+      font-weight: 600;
     }
   }
 </style>

@@ -1,6 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { IntakePayload } from '$lib/types/intake';
+import {
+  getServiceTitanConfig,
+  ServiceTitanError,
+  submitIntakeToServiceTitan
+} from '$lib/server/servicetitan';
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
@@ -64,11 +69,55 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ success: false, error: validationError }, { status: 400 });
   }
 
-  // Mock: log the payload for now. Real ServiceTitan integration goes here.
-  console.log('[api/intake] received payload', payload);
+  const config = getServiceTitanConfig();
 
-  return json({
-    success: true,
-    confirmationNumber: mockConfirmationNumber()
-  });
+  if (!config) {
+    // Dev / unconfigured: keep the mock path so the wizard works end-to-end.
+    console.log('[api/intake] ServiceTitan not configured — returning mock confirmation', {
+      jobType: payload.selectedJobType.name,
+      customer: `${payload.customer.firstName} ${payload.customer.lastName}`
+    });
+    return json({
+      success: true,
+      confirmationNumber: mockConfirmationNumber(),
+      mock: true
+    });
+  }
+
+  try {
+    const result = await submitIntakeToServiceTitan(config, payload);
+    console.log('[api/intake] ServiceTitan job created', result);
+    return json({
+      success: true,
+      confirmationNumber: `GLASS-${result.jobId}`,
+      serviceTitan: {
+        environment: config.environment,
+        jobId: result.jobId,
+        customerId: result.customerId,
+        locationId: result.locationId
+      }
+    });
+  } catch (err) {
+    if (err instanceof ServiceTitanError) {
+      // RFC 7807 problem-details surface (title + traceId + errors{} + ErrorCode).
+      // traceId is what ServiceTitan support asks for when you open a ticket.
+      console.error('[api/intake] ServiceTitan error', {
+        message: err.message,
+        status: err.status,
+        title: err.problem.title,
+        traceId: err.problem.traceId,
+        errorCode: err.problem.errorCode,
+        errors: err.problem.errors
+      });
+      return json(
+        {
+          success: false,
+          error: 'Unable to submit your request to our scheduling system. Please call us directly.'
+        },
+        { status: 502 }
+      );
+    }
+    console.error('[api/intake] unexpected error', err);
+    throw error(500, 'Internal error submitting intake');
+  }
 };

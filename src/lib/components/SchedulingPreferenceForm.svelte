@@ -18,7 +18,8 @@
 </script>
 
 <p class="note">
-  This is a request preference — not final scheduling. Our team will confirm the appointment.
+  This is a contact / visit preference — not final installation scheduling. Our team will confirm
+  the appointment.
 </p>
 
 <div class="grid">
@@ -36,14 +37,14 @@
 
 <style>
   .note {
-    margin: 0 0 0.75rem;
+    margin: 0 0 0.85rem;
     font-size: 0.9rem;
     color: var(--color-muted);
   }
 
   .grid {
     display: grid;
-    gap: 0.6rem;
+    gap: 0.55rem;
   }
 
   .tile {
@@ -55,6 +56,7 @@
     font-weight: 600;
     color: var(--color-text);
     text-align: left;
+    transition: border-color 0.15s ease, background 0.15s ease;
   }
 
   .tile:hover {
@@ -63,6 +65,6 @@
 
   .tile.active {
     border-color: var(--color-primary);
-    background: #e8f0f9;
+    background: var(--color-primary-soft);
   }
 </style>

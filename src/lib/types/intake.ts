@@ -30,13 +30,44 @@ export interface AddressInfo {
   zip: string;
 }
 
+export interface LadderInfo {
+  required: boolean;
+  story: string;
+}
+
+export interface SpecialInstructions {
+  gateCode: string;
+  hasDog: boolean;
+  parkingNotes: string;
+  preferredWindow: string;
+  other: string;
+}
+
+export interface CategoryDetails {
+  /** Storefront only: what part is being replaced/upgraded. */
+  storefrontScope?: string;
+  /** Storefront only: is the door currently operational? */
+  doorOperational?: 'yes' | 'no' | 'unsure' | '';
+  /** Shower/mirror only: type wanted (frameless / semi / framed; wall / vanity / gym). */
+  showerMirrorType?: string;
+  /** Shower/mirror only: approximate size. */
+  approximateSize?: string;
+  /** Hardware only: a short description of the hardware problem. */
+  hardwareProblem?: string;
+  /** Multi-service only: services they want combined. */
+  multiServiceList?: string;
+}
+
 export interface IssueDetails {
+  serviceLocation: string;
   description: string;
   happenedAt: string;
   isSecure: boolean;
   hasBrokenGlass: boolean;
   hasWaterOrWeatherEntry: boolean;
+  ladder: LadderInfo;
   photos: string[];
+  categoryDetails: CategoryDetails;
 }
 
 export interface SelectedJobTypeSummary {
@@ -51,6 +82,7 @@ export interface RoutingSummary {
   isDuringBusinessHours: boolean;
   businessHoursTimezone: string;
   routedBy: 'triage-tree';
+  priorityUpgrade: boolean;
 }
 
 export interface IntakePayload {
@@ -62,6 +94,7 @@ export interface IntakePayload {
   propertyType: PropertyType;
   answers: Record<string, string>;
   issueDetails: IssueDetails;
+  specialInstructions: SpecialInstructions;
   schedulingPreference: SchedulingPreference;
   createdAt: string;
 }
