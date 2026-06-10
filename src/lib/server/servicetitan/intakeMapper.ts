@@ -109,15 +109,32 @@ function inferCustomerType(payload: IntakePayload): 'Residential' | 'Commercial'
   return 'Residential';
 }
 
+/**
+ * ServiceTitan mangles non-ASCII into U+FFFD on the bookings endpoint
+ * (verified live). Transliterate typographic punctuation phone keyboards
+ * insert; drop anything else non-ASCII rather than ship � to dispatch.
+ */
+function toAscii(text: string): string {
+  return text
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—―]/g, '-')
+    .replace(/…/g, '...')
+    .replace(/ /g, ' ')
+    .replace(/[^\x20-\x7E\n]/g, '');
+}
+
 function buildBookingSummary(payload: IntakePayload): string {
   const lines: string[] = [];
-  lines.push(`[AUTOMATIC — PLEASE REVIEW] Web intake submission.`);
+  // ASCII only: ServiceTitan mangles non-ASCII (em-dashes etc.) into U+FFFD
+  // on this endpoint, verified on live bookings.
+  lines.push(`[AUTOMATIC - PLEASE REVIEW] Web intake submission.`);
   lines.push(`Selected service: ${payload.selectedJobType.name}`);
   if (payload.routing.isEmergency) {
     lines.push(
       payload.routing.isDuringBusinessHours
-        ? '⚠ EMERGENCY during business hours — customer expects priority dispatch (2-hour promise)'
-        : '⚠ EMERGENCY after hours — customer expects emergency dispatch (3-hour promise)'
+        ? '!! EMERGENCY during business hours - customer expects priority dispatch (2-hour promise)'
+        : '!! EMERGENCY after hours - customer expects emergency dispatch (3-hour promise)'
     );
   }
   if (payload.routing.priorityUpgrade) {
@@ -154,7 +171,7 @@ function buildBookingSummary(payload: IntakePayload): string {
   if (access.length) {
     lines.push('');
     lines.push('Access:');
-    for (const line of access) lines.push(`  • ${line}`);
+    for (const line of access) lines.push(`  * ${line}`);
   }
 
   const flags: string[] = [];
@@ -169,7 +186,7 @@ function buildBookingSummary(payload: IntakePayload): string {
   if (payload.issueDetails.photos.length) {
     lines.push(`${payload.issueDetails.photos.length} photo(s) attached to this booking.`);
   }
-  return lines.join('\n');
+  return toAscii(lines.join('\n'));
 }
 
 export interface IntakeSubmissionResult {
