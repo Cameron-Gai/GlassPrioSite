@@ -48,6 +48,28 @@ interface STCreateBookingRequest {
   campaignId?: number;
   jobTypeId?: number;
   bookingProviderId?: number;
+  /**
+   * Customer photos attached to the booking. EXACT FORMAT UNVERIFIED — the
+   * bookings POST contract for uploadedImages lives behind ServiceTitan's
+   * login-gated OpenAPI spec. Current best guess: an array of raw base64
+   * strings (no data: prefix). If the verify-first test booking shows photos
+   * not rendering, adjust `buildUploadedImages` below.
+   */
+  uploadedImages?: string[];
+}
+
+/**
+ * Convert our data-URL photos to whatever the bookings API expects.
+ * NOTE: format unverified — see uploadedImages above. Today we strip the
+ * `data:image/...;base64,` prefix and send raw base64 strings.
+ */
+function buildUploadedImages(payload: IntakePayload): string[] {
+  return payload.issueDetails.photos
+    .map((photo) => {
+      const comma = photo.dataUrl.indexOf(',');
+      return comma >= 0 ? photo.dataUrl.slice(comma + 1) : photo.dataUrl;
+    })
+    .filter((value) => value.length > 0);
 }
 
 interface STBookingResponse {
@@ -145,7 +167,7 @@ function buildBookingSummary(payload: IntakePayload): string {
     lines.push(`Customer prefers: ${payload.schedulingPreference}`);
   }
   if (payload.issueDetails.photos.length) {
-    lines.push(`Customer reports ${payload.issueDetails.photos.length} photo(s) available (upload mocked on site).`);
+    lines.push(`${payload.issueDetails.photos.length} photo(s) attached to this booking.`);
   }
   return lines.join('\n');
 }
@@ -166,6 +188,7 @@ export async function submitIntakeToServiceTitan(
   // Optional jobTypeId pre-fill — the CSR confirms/overrides at conversion, so
   // a missing mapping is not a blocker in this flow.
   const resolution = resolveJobTypeId(payload.selectedJobType.name, config.jobTypeIdOverrides);
+  const uploadedImages = buildUploadedImages(payload);
 
   const booking: STCreateBookingRequest = {
     source: 'customer-intake-site',
@@ -181,7 +204,8 @@ export async function submitIntakeToServiceTitan(
     // confirmation email the office hasn't reviewed.
     isSendConfirmationEmail: false,
     ...(config.campaignId !== null ? { campaignId: config.campaignId } : {}),
-    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {})
+    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {}),
+    ...(uploadedImages.length ? { uploadedImages } : {})
   };
 
   // The exact route varies by tenant/API version (per the GlassReports guide):

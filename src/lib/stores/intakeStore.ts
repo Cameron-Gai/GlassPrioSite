@@ -20,6 +20,7 @@ import type {
   PropertyType,
   SchedulingPreference,
   SelectedJobTypeSummary,
+  UploadedPhoto,
   SpecialInstructions
 } from '$lib/types/intake';
 
@@ -323,12 +324,12 @@ function createIntakeStore() {
     }));
   }
 
-  function addPhoto(name: string) {
+  function addPhoto(photo: UploadedPhoto) {
     store.update((state) => ({
       ...state,
       issueDetails: {
         ...state.issueDetails,
-        photos: [...state.issueDetails.photos, name]
+        photos: [...state.issueDetails.photos, photo]
       }
     }));
   }
@@ -338,7 +339,7 @@ function createIntakeStore() {
       ...state,
       issueDetails: {
         ...state.issueDetails,
-        photos: state.issueDetails.photos.filter((photo) => photo !== name)
+        photos: state.issueDetails.photos.filter((photo) => photo.name !== name)
       }
     }));
   }
@@ -374,7 +375,7 @@ function createIntakeStore() {
       issueDetails: {
         ...state.issueDetails,
         ladder: { ...state.issueDetails.ladder },
-        photos: [...state.issueDetails.photos],
+        photos: state.issueDetails.photos.map((p) => ({ ...p })),
         categoryDetails: { ...state.issueDetails.categoryDetails }
       },
       specialInstructions: { ...state.specialInstructions },

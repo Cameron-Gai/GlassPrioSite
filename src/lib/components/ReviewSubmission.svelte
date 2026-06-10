@@ -87,11 +87,11 @@
     {#if state.issueDetails.photos.length === 0}
       <p class="muted">No photos uploaded.</p>
     {:else}
-      <ul class="photos">
-        {#each state.issueDetails.photos as photo (photo)}
-          <li>{photo}</li>
+      <div class="thumbs">
+        {#each state.issueDetails.photos as photo (photo.name)}
+          <img class="thumb" src={photo.dataUrl} alt={photo.name} title={photo.name} />
         {/each}
-      </ul>
+      </div>
     {/if}
   </section>
 </div>
@@ -154,9 +154,18 @@
     margin: 0;
   }
 
-  .photos {
-    margin: 0;
-    padding-left: 1.1rem;
+  .thumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
   }
 
   @media (max-width: 520px) {

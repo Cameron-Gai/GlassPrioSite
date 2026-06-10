@@ -58,6 +58,13 @@ export interface CategoryDetails {
   multiServiceList?: string;
 }
 
+export interface UploadedPhoto {
+  /** Original file name, for display + the booking summary. */
+  name: string;
+  /** Compressed JPEG as a data URL (data:image/jpeg;base64,...). */
+  dataUrl: string;
+}
+
 export interface IssueDetails {
   serviceLocation: string;
   description: string;
@@ -66,7 +73,7 @@ export interface IssueDetails {
   hasBrokenGlass: boolean;
   hasWaterOrWeatherEntry: boolean;
   ladder: LadderInfo;
-  photos: string[];
+  photos: UploadedPhoto[];
   categoryDetails: CategoryDetails;
 }
 

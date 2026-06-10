@@ -1,11 +1,11 @@
 <script lang="ts">
   import { intakeStore } from '$lib/stores/intakeStore';
   import PhotoUploadMock from './PhotoUploadMock.svelte';
-  import type { PropertyType, SpecialInstructions } from '$lib/types/intake';
+  import type { PropertyType, SpecialInstructions, UploadedPhoto } from '$lib/types/intake';
 
   export let propertyType: PropertyType;
   export let special: SpecialInstructions;
-  export let photos: string[];
+  export let photos: UploadedPhoto[];
   export let photosRequired = false;
   export let showErrors = false;
 
