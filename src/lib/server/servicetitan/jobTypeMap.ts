@@ -26,7 +26,7 @@ export const DEFAULT_JOB_TYPE_ID_MAP: Record<string, number | null> = {
   'Hardware Service Consultation - Residential': null,
   'Hardware Service Consultation - Commercial': null,
   'Multiservice Consultation': null,
-  'Critical - Measure and Installation Requirements': null,
+  'Advanced Measurement System (AMS)': null,
   Other: null
 };
 
