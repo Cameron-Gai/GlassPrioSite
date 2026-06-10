@@ -8,30 +8,20 @@ export interface ServiceTitanConfig {
   appKey: string;
   clientId: string;
   clientSecret: string;
-  /** Required for /jpm/v2/.../jobs — the business unit the job is filed under. */
-  businessUnitId: number;
   /**
-   * Required for /jpm/v2/.../jobs in this tenant. Production has verified that
-   * Job creation returns 400 without a campaignId, even though the field
-   * documentation reads "optional". Treat it as required.
+   * Required for the Bookings flow. A Booking Provider Tag must exist in the
+   * ServiceTitan UI (Settings → Integrations → Booking Provider Tags); its
+   * numeric ID goes here. Discover via:
+   *   GET /crm/v2/tenant/{tenant}/booking-provider-tags
    */
-  campaignId: number;
+  bookingProviderId: number;
   /**
-   * Required hold reason ID for the create→hold sequence. Intake submissions
-   * are not real bookings — we always place them on hold immediately so the
-   * customer is not notified before dispatch reviews. Find at:
-   *   Settings → Hold reasons (typical name: "Needs review" / "Waiting for materials")
+   * Optional — campaign for attribution. Bookings accept a null campaign (the
+   * CSR can attribute at conversion), so unlike direct job creation this is
+   * not required.
    */
-  holdReasonId: number;
-  /**
-   * Required review tag applied to every job this tool creates or touches.
-   * Operations standard: use the "Automatic, Please Review" tag — same one
-   * GlassReports' estimate automation uses. Find at:
-   *   ServiceTitan → Settings → Tags → Tag Types
-   * or via GET /settings/v2/tenant/{tenant}/tag-types.
-   */
-  reviewTagId: number;
-  /** Optional JSON map of our job type name → ServiceTitan job type ID. Overrides the default map in jobTypeMap.ts. */
+  campaignId: number | null;
+  /** Optional JSON map of our job type name → ServiceTitan job type ID. Pre-fills the booking's jobTypeId when present. */
   jobTypeIdOverrides: Record<string, number> | null;
   authBaseUrl: string;
   apiBaseUrl: string;
@@ -63,8 +53,7 @@ function readJson(name: string): Record<string, number> | null {
 }
 
 // Match the GlassReports convention so a shared Railway env reads identically
-// across projects. Accept the older SERVICETITAN_ENV name as a fallback so we
-// don't break local .env files set up earlier.
+// across projects. Accept the older SERVICETITAN_ENV name as a fallback.
 const envRaw = (env.SERVICETITAN_ENVIRONMENT ?? env.SERVICETITAN_ENV ?? 'integration').toLowerCase();
 const envName: STEnvironment = envRaw === 'production' ? 'production' : 'integration';
 
@@ -83,21 +72,9 @@ function buildConfig(): ServiceTitanConfig | null {
   const appKey = env.SERVICETITAN_APP_KEY;
   const clientId = env.SERVICETITAN_CLIENT_ID;
   const clientSecret = env.SERVICETITAN_CLIENT_SECRET;
-  const businessUnitId = readInt('SERVICETITAN_BUSINESS_UNIT_ID');
-  const campaignId = readInt('SERVICETITAN_CAMPAIGN_ID');
-  const holdReasonId = readInt('SERVICETITAN_HOLD_REASON_ID');
-  const reviewTagId = readInt('SERVICETITAN_REVIEW_TAG_ID');
+  const bookingProviderId = readInt('SERVICETITAN_BOOKING_PROVIDER_ID');
 
-  if (
-    !tenantId ||
-    !appKey ||
-    !clientId ||
-    !clientSecret ||
-    businessUnitId === null ||
-    campaignId === null ||
-    holdReasonId === null ||
-    reviewTagId === null
-  ) {
+  if (!tenantId || !appKey || !clientId || !clientSecret || bookingProviderId === null) {
     return null;
   }
 
@@ -107,10 +84,8 @@ function buildConfig(): ServiceTitanConfig | null {
     appKey,
     clientId,
     clientSecret,
-    businessUnitId,
-    campaignId,
-    holdReasonId,
-    reviewTagId,
+    bookingProviderId,
+    campaignId: readInt('SERVICETITAN_CAMPAIGN_ID'),
     jobTypeIdOverrides: readJson('SERVICETITAN_JOB_TYPE_IDS'),
     authBaseUrl,
     apiBaseUrl

@@ -4,19 +4,23 @@ import { resolveJobTypeId } from './jobTypeMap';
 import { ServiceTitanError, stRequest } from './client';
 
 /**
- * Production-verified write sequence, mirroring the GlassReports pattern:
- *   1. POST customer
- *   2. POST location
- *   3. POST job  (with required campaignId, optional review tag, placeholder appt)
- *   4. PUT hold  (immediately, so the placeholder appointment never notifies)
+ * Bookings-first intake write (the GlassReports guide's recommended flow):
+ * one POST creates a Booking that lands on ServiceTitan's Job Booking screen,
+ * where a CSR converts it — ST's native workflow then handles customer
+ * dedupe, location creation, job booking, and scheduling with full UI
+ * validation. No job/customer/location records are created by us directly,
+ * so a failed submission leaves nothing dangling in ServiceTitan.
  *
- * Step 4 (hold) is critical: without it, ServiceTitan can dispatch
- * notifications about the placeholder appointment we sent on step 3 before
- * dispatch has reviewed the request. The GlassReports production guide marks
- * this CRITICAL.
+ * Prerequisite (one-time, in the ST UI): a Booking Provider Tag under
+ * Settings → Integrations → Booking Provider Tags. Its ID is
+ * SERVICETITAN_BOOKING_PROVIDER_ID.
+ *
+ * Idempotency: every submission carries a unique externalId. ServiceTitan
+ * does NOT dedupe bookings server-side; the externalId is our marker for
+ * later closed-loop polling (GET bookings → status/jobId) and replay safety.
  */
 
-interface STAddress {
+interface STBookingAddress {
   street: string;
   unit?: string;
   city: string;
@@ -25,68 +29,39 @@ interface STAddress {
   country: string;
 }
 
-interface STContactInput {
+interface STBookingContact {
   type: 'Phone' | 'MobilePhone' | 'Email';
   value: string;
-  memo?: string;
 }
 
-interface STCreateCustomerRequest {
+interface STCreateBookingRequest {
+  source: string;
   name: string;
-  type: 'Residential' | 'Commercial';
-  doNotMail: boolean;
-  doNotService: boolean;
-  address: STAddress;
-  contacts: STContactInput[];
-}
-
-interface STCreateLocationRequest {
-  customerId: number;
-  name: string;
-  address: STAddress;
-  contacts?: STContactInput[];
-}
-
-interface STAppointmentInput {
-  start: string;
-  end: string;
-}
-
-interface STCreateJobRequest {
-  customerId: number;
-  locationId: number;
-  jobTypeId: number;
-  priority: 'Urgent' | 'High' | 'Normal' | 'Low';
-  businessUnitId: number;
-  /** Required by the Jobs API in this tenant — production-verified 400 without it. */
-  campaignId: number;
   summary: string;
-  /** Always includes the "Automatic, Please Review" tag — every job we touch is tagged for ops review. */
-  tagTypeIds: number[];
-  appointments?: STAppointmentInput[];
+  address: STBookingAddress;
+  contacts: STBookingContact[];
+  customerType: 'Residential' | 'Commercial';
+  priority: 'Urgent' | 'High' | 'Normal' | 'Low';
+  isFirstTimeClient: boolean;
+  externalId: string;
+  isSendConfirmationEmail: boolean;
+  campaignId?: number;
+  jobTypeId?: number;
+  bookingProviderId?: number;
 }
 
-interface STHoldRequest {
-  reasonId: number;
-  memo: string;
-}
-
-interface STIdResponse {
+interface STBookingResponse {
   id: number;
 }
 
-/**
- * Phone normalization: ServiceTitan stores 10-digit US numbers; strip "+1",
- * punctuation, and spaces so contacts don't reject on format. Matches the
- * GlassReports production normalization.
- */
+/** ServiceTitan stores 10-digit US numbers; strip "+1" and punctuation. */
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/[^0-9]/g, '');
   if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1);
   return digits;
 }
 
-function buildAddress(payload: IntakePayload): STAddress {
+function buildAddress(payload: IntakePayload): STBookingAddress {
   return {
     street: payload.address.street.trim(),
     city: payload.address.city.trim(),
@@ -96,8 +71,8 @@ function buildAddress(payload: IntakePayload): STAddress {
   };
 }
 
-function buildContacts(payload: IntakePayload): STContactInput[] {
-  const contacts: STContactInput[] = [];
+function buildContacts(payload: IntakePayload): STBookingContact[] {
+  const contacts: STBookingContact[] = [];
   const phone = normalizePhone(payload.customer.phone);
   if (phone) contacts.push({ type: 'MobilePhone', value: phone });
   if (payload.customer.email.trim()) {
@@ -112,30 +87,19 @@ function inferCustomerType(payload: IntakePayload): 'Residential' | 'Commercial'
   return 'Residential';
 }
 
-/**
- * Placeholder appointment window (~next morning Pacific). The job is held
- * immediately after creation, so the slot is just a value the dispatcher
- * adjusts when they review. Matches the GlassReports pattern.
- */
-function placeholderAppointmentWindow(): STAppointmentInput {
-  const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  start.setUTCHours(17, 0, 0, 0); // ~9am Pacific
-  const end = new Date(start.getTime() + 60 * 60 * 1000);
-  return { start: start.toISOString(), end: end.toISOString() };
-}
-
-function buildJobSummary(payload: IntakePayload): string {
+function buildBookingSummary(payload: IntakePayload): string {
   const lines: string[] = [];
-  lines.push(`Selected: ${payload.selectedJobType.name}`);
+  lines.push(`[AUTOMATIC — PLEASE REVIEW] Web intake submission.`);
+  lines.push(`Selected service: ${payload.selectedJobType.name}`);
   if (payload.routing.isEmergency) {
     lines.push(
       payload.routing.isDuringBusinessHours
-        ? '⚠ Emergency during business hours — priority dispatch'
-        : '⚠ Emergency after hours — emergency dispatch'
+        ? '⚠ EMERGENCY during business hours — customer expects priority dispatch (2-hour promise)'
+        : '⚠ EMERGENCY after hours — customer expects emergency dispatch (3-hour promise)'
     );
   }
   if (payload.routing.priorityUpgrade) {
-    lines.push('Customer accepted Priority Service upgrade ($399).');
+    lines.push('Customer accepted the Priority Service upgrade ($399).');
   }
   if (payload.issueDetails.serviceLocation) {
     lines.push(`Location on property: ${payload.issueDetails.serviceLocation}`);
@@ -172,7 +136,7 @@ function buildJobSummary(payload: IntakePayload): string {
   }
 
   const flags: string[] = [];
-  if (!payload.issueDetails.isSecure) flags.push('Opening not secure');
+  if (!payload.issueDetails.isSecure) flags.push('Opening NOT secure');
   if (payload.issueDetails.hasBrokenGlass) flags.push('Broken glass on site');
   if (payload.issueDetails.hasWaterOrWeatherEntry) flags.push('Water / weather entering');
   if (flags.length) lines.push(`Site flags: ${flags.join(', ')}`);
@@ -181,121 +145,81 @@ function buildJobSummary(payload: IntakePayload): string {
     lines.push(`Customer prefers: ${payload.schedulingPreference}`);
   }
   if (payload.issueDetails.photos.length) {
-    lines.push(`Photos attached on intake: ${payload.issueDetails.photos.length}`);
+    lines.push(`Customer reports ${payload.issueDetails.photos.length} photo(s) available (upload mocked on site).`);
   }
-  lines.push('');
-  lines.push('⚠ Placeholder appointment + on hold — adjust schedule before releasing.');
-  lines.push('Submitted via customer intake site.');
   return lines.join('\n');
 }
 
-function buildHoldMemo(payload: IntakePayload): string {
-  const who = `${payload.customer.firstName} ${payload.customer.lastName}`.trim() || 'web visitor';
-  return `Auto-created from web intake (${who}). Held pending dispatch review — adjust schedule and remove hold to release.`;
-}
-
 export interface IntakeSubmissionResult {
-  customerId: number;
-  locationId: number;
-  jobId: number;
+  bookingId: number;
+  externalId: string;
 }
 
 export async function submitIntakeToServiceTitan(
   config: ServiceTitanConfig,
   payload: IntakePayload
 ): Promise<IntakeSubmissionResult> {
-  const jobTypeName = payload.selectedJobType.name;
-  const resolution = resolveJobTypeId(jobTypeName, config.jobTypeIdOverrides);
-  if (resolution.id === null) {
-    throw new ServiceTitanError(
-      `No ServiceTitan Job Type ID configured for "${jobTypeName}". Set it in jobTypeMap.ts or via SERVICETITAN_JOB_TYPE_IDS.`,
-      { status: 0, title: 'Missing job type mapping', raw: { jobTypeName } }
-    );
-  }
-
-  const customerType = inferCustomerType(payload);
+  // Web Crypto global (Node 19+) — avoids needing @types/node for node:crypto.
+  const externalId = `glass-intake-${crypto.randomUUID()}`;
   const fullName = `${payload.customer.firstName} ${payload.customer.lastName}`.trim();
-  const address = buildAddress(payload);
-  const contacts = buildContacts(payload);
 
-  // 1) Customer
-  const customerRequest: STCreateCustomerRequest = {
+  // Optional jobTypeId pre-fill — the CSR confirms/overrides at conversion, so
+  // a missing mapping is not a blocker in this flow.
+  const resolution = resolveJobTypeId(payload.selectedJobType.name, config.jobTypeIdOverrides);
+
+  const booking: STCreateBookingRequest = {
+    source: 'customer-intake-site',
     name: fullName || 'Web intake customer',
-    type: customerType,
-    doNotMail: false,
-    doNotService: false,
-    address,
-    contacts
+    summary: buildBookingSummary(payload),
+    address: buildAddress(payload),
+    contacts: buildContacts(payload),
+    customerType: inferCustomerType(payload),
+    priority: (payload.selectedJobType.priority || 'Normal') as STCreateBookingRequest['priority'],
+    isFirstTimeClient: true,
+    externalId,
+    // CSR contact comes through ST's own workflow; don't fire an automated
+    // confirmation email the office hasn't reviewed.
+    isSendConfirmationEmail: false,
+    ...(config.campaignId !== null ? { campaignId: config.campaignId } : {}),
+    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {})
   };
-  const customer = await stRequest<STIdResponse>(
-    config,
-    'crm/v2',
-    'customers',
-    { method: 'POST', body: customerRequest }
-  );
 
-  // 2) Location
-  const locationRequest: STCreateLocationRequest = {
-    customerId: customer.id,
-    name: 'Service location',
-    address,
-    contacts
-  };
-  const location = await stRequest<STIdResponse>(
-    config,
-    'crm/v2',
-    'locations',
-    { method: 'POST', body: locationRequest }
-  );
+  // The exact route varies by tenant/API version (per the GlassReports guide):
+  // some expose a provider-scoped path, others take bookingProviderId in the
+  // body. Try candidates in order; 404 "Unable to match incoming request to an
+  // operation" means wrong path, so fall through. Any other error is real.
+  const candidates: Array<{ resource: string; body: STCreateBookingRequest }> = [
+    {
+      resource: `booking-provider/${config.bookingProviderId}/bookings`,
+      body: booking
+    },
+    {
+      resource: 'bookings',
+      body: { ...booking, bookingProviderId: config.bookingProviderId }
+    }
+  ];
 
-  // 3) Job — always carries the "Automatic, Please Review" tag.
-  const jobRequest: STCreateJobRequest = {
-    customerId: customer.id,
-    locationId: location.id,
-    jobTypeId: resolution.id,
-    priority: (payload.selectedJobType.priority || 'Normal') as STCreateJobRequest['priority'],
-    businessUnitId: config.businessUnitId,
-    campaignId: config.campaignId,
-    summary: buildJobSummary(payload),
-    tagTypeIds: [config.reviewTagId],
-    appointments: [placeholderAppointmentWindow()]
-  };
-  const job = await stRequest<STIdResponse>(
-    config,
-    'jpm/v2',
-    'jobs',
-    { method: 'POST', body: jobRequest }
-  );
-
-  // 4) Hold (CRITICAL — without this the placeholder appointment can notify the customer).
-  // If this fails, the job exists and is dangerous. Surface that loudly.
-  try {
-    const holdRequest: STHoldRequest = {
-      reasonId: config.holdReasonId,
-      memo: buildHoldMemo(payload)
-    };
-    await stRequest<void>(config, 'jpm/v2', `jobs/${job.id}/hold`, {
-      method: 'PUT',
-      body: holdRequest
-    });
-  } catch (holdError) {
-    const wrapped =
-      holdError instanceof ServiceTitanError
-        ? holdError
-        : new ServiceTitanError(
-            'ServiceTitan hold step failed',
-            { status: 0, title: String(holdError) }
-          );
-    throw new ServiceTitanError(
-      `Job #${job.id} created but HOLD FAILED — customer may receive notifications about the placeholder appointment. ` +
-        `Place this job on hold manually in ServiceTitan ASAP. ${wrapped.message}`,
-      { ...wrapped.problem, raw: { ...wrapped.problem.raw as object, leakedJobId: job.id } }
-    );
+  let lastError: ServiceTitanError | null = null;
+  for (const candidate of candidates) {
+    try {
+      const created = await stRequest<STBookingResponse>(config, 'crm/v2', candidate.resource, {
+        method: 'POST',
+        body: candidate.body
+      });
+      return { bookingId: created.id, externalId };
+    } catch (error) {
+      if (error instanceof ServiceTitanError && error.status === 404) {
+        // Wrong route shape for this tenant — try the next candidate.
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
   }
 
-  return {
-    customerId: customer.id,
-    locationId: location.id,
-    jobId: job.id
-  };
+  throw lastError ??
+    new ServiceTitanError('No booking route candidate succeeded', {
+      status: 404,
+      title: 'No booking route matched'
+    });
 }

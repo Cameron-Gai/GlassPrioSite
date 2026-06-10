@@ -86,15 +86,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
   try {
     const result = await submitIntakeToServiceTitan(config, payload);
-    console.log('[api/intake] ServiceTitan job created', result);
+    console.log('[api/intake] ServiceTitan booking created', result);
     return json({
       success: true,
-      confirmationNumber: `GLASS-${result.jobId}`,
+      confirmationNumber: `GLASS-${result.bookingId}`,
       serviceTitan: {
         environment: config.environment,
-        jobId: result.jobId,
-        customerId: result.customerId,
-        locationId: result.locationId
+        bookingId: result.bookingId,
+        externalId: result.externalId
       }
     });
   } catch (err) {
