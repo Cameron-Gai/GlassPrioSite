@@ -161,10 +161,10 @@ export const triageTree: Record<string, TriageNode> = {
       },
       {
         id: 'cat-measurement',
-        label: 'Measurement requirements',
-        helperText: 'Critical measure or install checks',
+        label: 'Preemptive measurement',
+        helperText: 'Measure now, save on future repairs',
         icon: 'measure',
-        routeJobTypeName: 'Critical - Measure and Installation Requirements'
+        routeJobTypeName: 'Advanced Measurement System (AMS)'
       },
       {
         id: 'cat-other',

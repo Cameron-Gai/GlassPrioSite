@@ -30,26 +30,34 @@ export interface JobType {
 
 export const jobTypes: JobType[] = [
   {
-    // Booked internally by a client manager — not exposed in public intake.
     name: 'Advanced Measurement System (AMS)',
     priority: 'High',
     duration: '2 hours',
     category: 'measurement',
-    customerFacing: false,
-    publicIntakeEnabled: false
+    customerFacing: true,
+    publicIntakeEnabled: true,
+    customerLabel: 'Preemptive Measurement',
+    summary:
+      'Measure your windows now — before anything breaks. We document every opening with photos and keep the schedule on file, so any future glass replacement skips the measurement step and is discounted.',
+    includes: [
+      'Detailed on-site measurement of every window and opening',
+      'Documented with photos and kept on file',
+      'Future replacements skip the measure — faster and discounted'
+    ],
+    pricing: {
+      display: '$350 per building',
+      rebate: 'Future repairs skip the measure fee'
+    },
+    consultationFormat: 'on-site'
   },
   {
+    // Booked internally by a client manager — not exposed in public intake.
     name: 'Critical - Measure and Installation Requirements',
     priority: 'High',
     duration: '1 hour',
     category: 'measurement',
-    customerFacing: true,
-    publicIntakeEnabled: true,
-    customerLabel: 'Critical Measurement / Install Requirements',
-    summary:
-      'For specialized measurement or pre-install requirements that need a technician on-site to confirm.',
-    pricing: { display: 'Quoted on-site' },
-    consultationFormat: 'on-site'
+    customerFacing: false,
+    publicIntakeEnabled: false
   },
   {
     name: 'Custom Shower Enclosure Or Mirrors - Consultation',
