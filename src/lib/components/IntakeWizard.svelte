@@ -170,7 +170,7 @@
         <p>Double-check everything below, then submit.</p>
       </header>
       <ReviewSubmission {state} />
-      {#if state.submitError}
+      {#if state.submitError && !state.feeQuote?.paymentRequired}
         <p class="form-error">{state.submitError}</p>
       {/if}
     {:else if state.step === 'confirmation'}
@@ -179,18 +179,26 @@
   </div>
 
   {#if state.step !== 'confirmation'}
-    {@const showSubmit = state.step === 'review'}
+    {@const atReview = state.step === 'review'}
+    {@const feeResolved = state.feeQuote !== null}
+    {@const feeDue = state.feeQuote?.paymentRequired === true}
+    <!-- When a fee is due the PaymentStep owns the "Pay & submit" button; the
+         wizard only shows its own Submit for free/no-charge requests. -->
+    {@const showWizardSubmit = atReview && feeResolved && !feeDue}
+    {@const showFeeLoading = atReview && !feeResolved}
     {@const showContinue = !['triage', 'priority-upgrade', 'review'].includes(state.step)}
-    {@const showActions = canGoBack || showSubmit || showContinue}
+    {@const showActions = canGoBack || showWizardSubmit || showContinue || showFeeLoading}
     {#if showActions}
-      <div class="actions" class:back-only={canGoBack && !showSubmit && !showContinue}>
+      <div class="actions" class:back-only={canGoBack && !showWizardSubmit && !showContinue && !showFeeLoading}>
         {#if canGoBack}
           <button type="button" class="ghost" on:click={back}>Back</button>
         {/if}
-        {#if showSubmit}
+        {#if showWizardSubmit}
           <button type="button" class="primary" on:click={submit} disabled={state.submitting}>
             {state.submitting ? 'Submitting…' : 'Submit request'}
           </button>
+        {:else if showFeeLoading}
+          <button type="button" class="primary" disabled>Checking your area…</button>
         {:else if showContinue}
           <button type="button" class="primary" on:click={next}>Continue</button>
         {/if}

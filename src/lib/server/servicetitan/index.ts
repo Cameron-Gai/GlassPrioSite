@@ -4,4 +4,4 @@ export {
   type ServiceTitanConfig
 } from './config';
 export { ServiceTitanError } from './client';
-export { submitIntakeToServiceTitan, type IntakeSubmissionResult } from './intakeMapper';
+export { submitIntakeToServiceTitan, type IntakeSubmissionResult, type BookingFeeContext } from './intakeMapper';

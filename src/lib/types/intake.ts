@@ -103,5 +103,7 @@ export interface IntakePayload {
   issueDetails: IssueDetails;
   specialInstructions: SpecialInstructions;
   schedulingPreference: SchedulingPreference;
+  /** Stripe PaymentIntent id for the authorized on-site charge, when one was collected. */
+  paymentIntentId?: string | null;
   createdAt: string;
 }

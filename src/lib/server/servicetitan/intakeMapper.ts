@@ -1,7 +1,21 @@
+import { env } from '$env/dynamic/private';
 import type { IntakePayload } from '$lib/types/intake';
 import type { ServiceTitanConfig } from './config';
 import { resolveJobTypeId } from './jobTypeMap';
 import { ServiceTitanError, stRequest } from './client';
+
+/** On-site-charge context resolved from the GlassReports zone map, attached to the booking. */
+export interface BookingFeeContext {
+  osc: number;
+  serviced: boolean;
+  zoneId: string | null;
+  zoneName: string | null;
+  /** True when the OSC was collected (captured) online via Stripe. */
+  paid: boolean;
+  paymentIntentId: string | null;
+  /** Diagnostic reason when the OSC was not collected online. */
+  flag: string;
+}
 
 /**
  * Bookings-first intake write (the GlassReports guide's recommended flow):
@@ -48,6 +62,11 @@ interface STCreateBookingRequest {
   campaignId?: number;
   jobTypeId?: number;
   bookingProviderId?: number;
+  // Structured key/value pairs ServiceTitan stores on the booking. We use it to
+  // carry the on-site charge + Stripe payment reference. Toggle off with
+  // SERVICETITAN_BOOKING_EXTERNALDATA=0 if a tenant's bookings endpoint rejects
+  // it (the same info is always in `summary` as a fallback).
+  externalData?: Array<{ key: string; value: string }>;
   // NOTE: no uploadedImages — verified live that the bookings POST stores the
   // value as an opaque string the ST UI can't render (and no integration in
   // the tenant uses it). Photos are self-hosted; their URLs go in `summary`.
@@ -105,12 +124,44 @@ function toAscii(text: string): string {
     .replace(/[^\x20-\x7E\n]/g, '');
 }
 
-function buildBookingSummary(payload: IntakePayload, photoUrls: string[]): string {
+/** One-line on-site-charge summary for the CSR (always present in the booking notes). */
+function feeLine(feeCtx?: BookingFeeContext): string | null {
+  if (!feeCtx) return null;
+  const zone = feeCtx.zoneName ? ` (Zone ${feeCtx.zoneName})` : '';
+  if (feeCtx.serviced && feeCtx.osc > 0) {
+    return feeCtx.paid
+      ? `On-site charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}).`
+      : `On-site charge: $${feeCtx.osc}${zone} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
+  }
+  if (!feeCtx.serviced) {
+    return `On-site charge: ZIP not found in the service-area map - office to confirm coverage and quote the fee.`;
+  }
+  return `On-site charge: none for this service.`;
+}
+
+/** Structured key/value pairs mirrored onto the booking (toggle with SERVICETITAN_BOOKING_EXTERNALDATA). */
+function buildExternalData(feeCtx?: BookingFeeContext): Array<{ key: string; value: string }> | undefined {
+  if (env.SERVICETITAN_BOOKING_EXTERNALDATA === '0' || !feeCtx) return undefined;
+  const data: Array<{ key: string; value: string }> = [
+    { key: 'osc_amount', value: String(feeCtx.osc) },
+    { key: 'osc_serviced', value: String(feeCtx.serviced) },
+  ];
+  if (feeCtx.zoneId) data.push({ key: 'osc_zone', value: feeCtx.zoneId });
+  if (feeCtx.paid && feeCtx.paymentIntentId) {
+    data.push({ key: 'osc_paid', value: 'true' });
+    data.push({ key: 'stripe_payment_intent', value: feeCtx.paymentIntentId });
+  }
+  return data;
+}
+
+function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx?: BookingFeeContext): string {
   const lines: string[] = [];
   // ASCII only: ServiceTitan mangles non-ASCII (em-dashes etc.) into U+FFFD
   // on this endpoint, verified on live bookings.
   lines.push(`[AUTOMATIC - PLEASE REVIEW] Web intake submission.`);
   lines.push(`Selected service: ${payload.selectedJobType.name}`);
+  const fee = feeLine(feeCtx);
+  if (fee) lines.push(fee);
   if (payload.routing.isEmergency) {
     lines.push(
       payload.routing.isDuringBusinessHours
@@ -180,7 +231,8 @@ export interface IntakeSubmissionResult {
 export async function submitIntakeToServiceTitan(
   config: ServiceTitanConfig,
   payload: IntakePayload,
-  photoUrls: string[] = []
+  photoUrls: string[] = [],
+  feeCtx?: BookingFeeContext
 ): Promise<IntakeSubmissionResult> {
   const externalId = `glass-intake-${crypto.randomUUID()}`;
   const fullName = `${payload.customer.firstName} ${payload.customer.lastName}`.trim();
@@ -188,11 +240,12 @@ export async function submitIntakeToServiceTitan(
   // Optional jobTypeId pre-fill — the CSR confirms/overrides at conversion, so
   // a missing mapping is not a blocker in this flow.
   const resolution = resolveJobTypeId(payload.selectedJobType.name, config.jobTypeIdOverrides);
+  const externalData = buildExternalData(feeCtx);
 
   const booking: STCreateBookingRequest = {
     source: 'customer-intake-site',
     name: fullName || 'Web intake customer',
-    summary: buildBookingSummary(payload, photoUrls),
+    summary: buildBookingSummary(payload, photoUrls, feeCtx),
     address: buildAddress(payload),
     contacts: buildContacts(payload),
     customerType: inferCustomerType(payload),
@@ -203,7 +256,8 @@ export async function submitIntakeToServiceTitan(
     // confirmation email the office hasn't reviewed.
     isSendConfirmationEmail: false,
     ...(config.campaignId !== null ? { campaignId: config.campaignId } : {}),
-    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {})
+    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {}),
+    ...(externalData ? { externalData } : {})
   };
 
   // The exact route varies by tenant/API version (per the GlassReports guide):

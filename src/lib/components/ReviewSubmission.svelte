@@ -1,5 +1,6 @@
 <script lang="ts">
   import JobTypeBanner from './JobTypeBanner.svelte';
+  import PaymentStep from './PaymentStep.svelte';
   import type { IntakeState } from '$lib/stores/intakeStore';
 
   export let state: IntakeState;
@@ -94,6 +95,8 @@
       </div>
     {/if}
   </section>
+
+  <PaymentStep {state} />
 </div>
 
 <style>

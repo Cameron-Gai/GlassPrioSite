@@ -6,6 +6,11 @@
   export let isEmergency = false;
   export let isDuringBusinessHours = false;
   export let priorityUpgrade = false;
+
+  // Per-job fees now come from the zone map and are shown (and collected) at the
+  // review step once we know the customer's ZIP. Only priority/emergency keep a
+  // fixed up-front price here.
+  $: showStaticPrice = job.category === 'emergency';
 </script>
 
 <aside class="banner fade-in" class:emergency={isEmergency}>
@@ -36,19 +41,19 @@
     </ul>
   {/if}
 
-  {#if job.pricing || job.duration}
+  {#if (showStaticPrice && job.pricing) || job.duration}
     <div class="chips">
-      {#if job.pricing}
+      {#if showStaticPrice && job.pricing}
         <span class="chip price">{job.pricing.display}</span>
       {/if}
-      {#if job.pricing?.rebate}
+      {#if showStaticPrice && job.pricing?.rebate}
         <span class="chip rebate">{job.pricing.rebate}</span>
       {/if}
       {#if job.duration}
         <span class="chip duration">~{job.duration}</span>
       {/if}
     </div>
-    {#if job.pricing?.detail}
+    {#if showStaticPrice && job.pricing?.detail}
       <p class="detail">{job.pricing.detail}</p>
     {/if}
   {/if}

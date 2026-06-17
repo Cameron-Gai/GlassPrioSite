@@ -35,6 +35,17 @@ export type WizardStep =
   | 'review'
   | 'confirmation';
 
+/** The on-site-charge quote for the customer's ZIP + job type, resolved at review. */
+export interface FeeQuoteClient {
+  serviced: boolean;
+  osc: number;
+  currency: string;
+  zoneName: string | null;
+  flag: string;
+  /** True only when a real (>0) charge must be collected online via Stripe. */
+  paymentRequired: boolean;
+}
+
 export interface IntakeState {
   step: WizardStep;
   triageHistory: string[];
@@ -52,6 +63,11 @@ export interface IntakeState {
   issueDetails: IssueDetails;
   specialInstructions: SpecialInstructions;
   schedulingPreference: SchedulingPreference;
+  /** Resolved at the review step; null while not yet loaded. */
+  feeQuote: FeeQuoteClient | null;
+  /** Stripe PaymentIntent id once the card hold is authorized. */
+  paymentIntentId: string | null;
+  paymentAuthorized: boolean;
   confirmationNumber: string | null;
   submitting: boolean;
   submitError: string | null;
@@ -123,6 +139,9 @@ function initialState(): IntakeState {
       other: ''
     },
     schedulingPreference: '',
+    feeQuote: null,
+    paymentIntentId: null,
+    paymentAuthorized: false,
     confirmationNumber: null,
     submitting: false,
     submitError: null
@@ -283,7 +302,26 @@ function createIntakeStore() {
   }
 
   function updateAddress(patch: Partial<AddressInfo>) {
-    store.update((state) => ({ ...state, address: { ...state.address, ...patch } }));
+    // A ZIP change can change the fee — drop any prior fee/authorization.
+    store.update((state) => ({
+      ...state,
+      address: { ...state.address, ...patch },
+      feeQuote: null,
+      paymentIntentId: null,
+      paymentAuthorized: false
+    }));
+  }
+
+  function setFeeQuote(quote: FeeQuoteClient) {
+    store.update((state) => ({ ...state, feeQuote: quote }));
+  }
+
+  function setPaymentAuthorized(paymentIntentId: string) {
+    store.update((state) => ({ ...state, paymentIntentId, paymentAuthorized: true }));
+  }
+
+  function resetPayment() {
+    store.update((state) => ({ ...state, feeQuote: null, paymentIntentId: null, paymentAuthorized: false }));
   }
 
   function setPropertyType(value: PropertyType) {
@@ -380,11 +418,12 @@ function createIntakeStore() {
       },
       specialInstructions: { ...state.specialInstructions },
       schedulingPreference: state.schedulingPreference,
+      paymentIntentId: state.paymentAuthorized ? state.paymentIntentId : null,
       createdAt: new Date().toISOString()
     };
   }
 
-  async function submit(): Promise<void> {
+  async function submit(): Promise<boolean> {
     const state = get(store);
     const payload = buildPayload(state);
     console.log('[intake] submitting payload', payload);
@@ -411,9 +450,11 @@ function createIntakeStore() {
         submitting: false,
         step: 'confirmation'
       }));
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Submission failed';
       store.update((s) => ({ ...s, submitting: false, submitError: message }));
+      return false;
     }
   }
 
@@ -430,6 +471,9 @@ function createIntakeStore() {
     goBack,
     updateCustomer,
     updateAddress,
+    setFeeQuote,
+    setPaymentAuthorized,
+    resetPayment,
     setPropertyType,
     updateIssueDetails,
     updateLadder,
