@@ -30,8 +30,10 @@ export interface AddressInfo {
   zip: string;
 }
 
+export type LadderAccess = 'no' | 'yes' | 'unsure';
+
 export interface LadderInfo {
-  required: boolean;
+  access: LadderAccess;
   story: string;
 }
 

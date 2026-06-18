@@ -119,8 +119,8 @@ export const triageTree: Record<string, TriageNode> = {
       },
       {
         id: 'cat-window-frame',
-        label: 'Window replacement',
-        helperText: 'New frames with glass',
+        label: 'Full window replacement',
+        helperText: 'Brand-new windows (frame + glass)',
         icon: 'window',
         nextNodeId: 'window-frames'
       },
@@ -202,18 +202,19 @@ export const triageTree: Record<string, TriageNode> = {
 
   'window-frames': {
     id: 'window-frames',
-    question: 'How many window frames need replacement?',
-    helperText: "If you're only replacing the glass (not the frame), go back and pick glass replacement.",
+    question: 'How many brand-new windows do you need?',
+    helperText:
+      "This is for replacing whole windows — frame and glass. If you only need the glass replaced (frame stays), go back and pick glass replacement.",
     layout: 'list',
     options: [
       {
         id: 'window-1-2',
-        label: '1–2 frames',
+        label: '1–2 windows',
         routeJobTypeName: 'New Window Replacement (1-2 Frames) - Consultation'
       },
       {
         id: 'window-3-plus',
-        label: '3 or more frames',
+        label: '3 or more windows',
         routeJobTypeName: 'New Window Replacement (3+ Frames) - Consultation'
       },
       {

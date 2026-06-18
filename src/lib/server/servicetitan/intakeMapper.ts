@@ -182,8 +182,10 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   if (payload.issueDetails.happenedAt) {
     lines.push(`When: ${payload.issueDetails.happenedAt}`);
   }
-  if (payload.issueDetails.ladder.required) {
+  if (payload.issueDetails.ladder.access === 'yes') {
     lines.push(`Ladder required: ${payload.issueDetails.ladder.story || 'height not noted'}`);
+  } else if (payload.issueDetails.ladder.access === 'unsure') {
+    lines.push('Ladder access: customer unsure — check exterior photo if provided.');
   }
   const cd = payload.issueDetails.categoryDetails;
   if (cd.storefrontScope) lines.push(`Storefront scope: ${cd.storefrontScope}`);

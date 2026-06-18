@@ -5,7 +5,6 @@
 
   export let value: IssueDetails;
   export let job: JobType | null;
-  export let showErrors = false;
 
   $: category = job?.category ?? '';
 
@@ -22,6 +21,11 @@
   }
 
   const doorOperationalOptions: Array<'yes' | 'no' | 'unsure'> = ['yes', 'no', 'unsure'];
+  const ladderOptions: Array<{ value: 'no' | 'yes' | 'unsure'; label: string }> = [
+    { value: 'no', label: 'No' },
+    { value: 'yes', label: 'Yes' },
+    { value: 'unsure', label: 'Unsure' }
+  ];
 
   $: details = value.categoryDetails;
 
@@ -45,7 +49,7 @@
       case 'glass-replacement':
         return 'Describe the damage and how the glass broke or fogged.';
       case 'window-replacement':
-        return 'Describe the frames and what condition they’re in.';
+        return 'Describe the windows and what condition they’re in.';
       case 'storefront-door':
         return 'Describe the storefront, doors, glass, and any damage.';
       case 'hardware':
@@ -59,16 +63,6 @@
     }
   })();
 
-  $: errors = {
-    serviceLocation: !value.serviceLocation.trim(),
-    description: value.description.trim().length < 5,
-    happenedAt: !value.happenedAt.trim(),
-    ladderStory: value.ladder.required && !value.ladder.story.trim(),
-    storefrontScope: category === 'storefront-door' && !details.storefrontScope?.trim(),
-    showerMirrorType: category === 'shower-mirror' && !details.showerMirrorType?.trim(),
-    multiServiceList: category === 'multiservice' && !details.multiServiceList?.trim(),
-    hardwareProblem: category === 'hardware' && !details.hardwareProblem?.trim()
-  };
 </script>
 
 <div class="grid">
@@ -85,7 +79,6 @@
           value={details.storefrontScope ?? ''}
           on:input={(event) => updateCategory('storefrontScope', event.currentTarget.value)}
         />
-        {#if showErrors && errors.storefrontScope}<p class="error">Please describe what needs work</p>{/if}
       </div>
       <div>
         <span class="pseudo-label">Is the door currently operational?</span>
@@ -118,7 +111,6 @@
           value={details.showerMirrorType ?? ''}
           on:input={(event) => updateCategory('showerMirrorType', event.currentTarget.value)}
         />
-        {#if showErrors && errors.showerMirrorType}<p class="error">Please describe the type</p>{/if}
       </div>
       <div>
         <label for="approximateSize">Approximate size</label>
@@ -150,7 +142,6 @@
           value={details.multiServiceList ?? ''}
           on:input={(event) => updateCategory('multiServiceList', event.currentTarget.value)}
         ></textarea>
-        {#if showErrors && errors.multiServiceList}<p class="error">List at least one service</p>{/if}
       </div>
     </fieldset>
   {/if}
@@ -167,12 +158,16 @@
           value={details.hardwareProblem ?? ''}
           on:input={(event) => updateCategory('hardwareProblem', event.currentTarget.value)}
         ></textarea>
-        {#if showErrors && errors.hardwareProblem}<p class="error">Please describe the problem</p>{/if}
       </div>
     </fieldset>
   {/if}
 
   <!-- Standard intake -->
+  <p class="nudge">
+    The more you can share, the faster we can help — details and photos let us send the right person
+    with the right materials. None of the fields below are required.
+  </p>
+
   <div>
     <label for="serviceLocation">Where is the issue?</label>
     <input
@@ -182,7 +177,6 @@
       value={value.serviceLocation}
       on:input={(event) => update('serviceLocation', event.currentTarget.value)}
     />
-    {#if showErrors && errors.serviceLocation}<p class="error">Please describe where the issue is</p>{/if}
   </div>
 
   <div>
@@ -194,7 +188,6 @@
       value={value.description}
       on:input={(event) => update('description', event.currentTarget.value)}
     ></textarea>
-    {#if showErrors && errors.description}<p class="error">A few more details, please</p>{/if}
   </div>
 
   <div>
@@ -206,33 +199,25 @@
       value={value.happenedAt}
       on:input={(event) => update('happenedAt', event.currentTarget.value)}
     />
-    {#if showErrors && errors.happenedAt}<p class="error">Please provide a rough timing</p>{/if}
   </div>
 
   <fieldset class="block">
     <legend>Ladder access</legend>
     <p class="legend-help">Will a ladder be needed to reach the work area?</p>
     <div class="segmented" role="radiogroup" aria-label="Ladder needed">
-      <button
-        type="button"
-        role="radio"
-        aria-checked={!value.ladder.required}
-        class:active={!value.ladder.required}
-        on:click={() => updateLadder('required', false)}
-      >
-        No
-      </button>
-      <button
-        type="button"
-        role="radio"
-        aria-checked={value.ladder.required}
-        class:active={value.ladder.required}
-        on:click={() => updateLadder('required', true)}
-      >
-        Yes
-      </button>
+      {#each ladderOptions as opt (opt.value)}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value.ladder.access === opt.value}
+          class:active={value.ladder.access === opt.value}
+          on:click={() => updateLadder('access', opt.value)}
+        >
+          {opt.label}
+        </button>
+      {/each}
     </div>
-    {#if value.ladder.required}
+    {#if value.ladder.access === 'yes'}
       <div>
         <label for="story">What story or height?</label>
         <input
@@ -242,8 +227,12 @@
           value={value.ladder.story}
           on:input={(event) => updateLadder('story', event.currentTarget.value)}
         />
-        {#if showErrors && errors.ladderStory}<p class="error">Please add an approximate height</p>{/if}
       </div>
+    {:else if value.ladder.access === 'unsure'}
+      <p class="legend-help">
+        No problem — a photo of the area from outside helps us judge the reach. You can add one on
+        the next step.
+      </p>
     {/if}
   </fieldset>
 
@@ -354,10 +343,14 @@
     margin: 0;
   }
 
-  .error {
-    color: var(--color-emergency);
-    margin: 0.3rem 0 0;
-    font-size: 0.85rem;
+  .nudge {
+    margin: 0;
+    padding: 0.7rem 0.85rem;
+    background: var(--color-primary-soft);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: 0.9rem;
+    line-height: 1.5;
   }
 
   .virtual-note {

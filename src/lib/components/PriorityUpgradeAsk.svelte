@@ -44,7 +44,7 @@
 
   <button type="button" class="standard" on:click={decline}>
     <span class="title">Standard timing is fine</span>
-    <span class="hint">Continue with the consultation we routed you to</span>
+    <span class="hint">We can get to most on-site consultations within 48 hours.</span>
   </button>
 </section>
 

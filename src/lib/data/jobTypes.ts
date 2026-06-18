@@ -238,9 +238,10 @@ export const jobTypes: JobType[] = [
     category: 'window-replacement',
     customerFacing: true,
     publicIntakeEnabled: true,
-    customerLabel: 'Window Replacement (1–2 frames) — Consultation',
-    summary: 'On-site assessment and quote for replacing one or two window frames with new glass.',
-    includes: ['Frame and glass assessment', 'Measurements', 'Written quote'],
+    customerLabel: 'Full Window Replacement (1–2 windows) — Consultation',
+    summary:
+      'On-site assessment and quote to replace 1–2 brand-new windows — frames and glass included (not glass-only).',
+    includes: ['New window (frame + glass) assessment', 'Measurements', 'Written quote'],
     pricing: { display: 'Free consultation' },
     consultationFormat: 'on-site'
   },
@@ -259,9 +260,10 @@ export const jobTypes: JobType[] = [
     category: 'window-replacement',
     customerFacing: true,
     publicIntakeEnabled: true,
-    customerLabel: 'Window Replacement (3+ frames) — Consultation',
-    summary: 'On-site assessment and quote for replacing three or more window frames with new glass.',
-    includes: ['Frame and glass assessment for each opening', 'Measurements', 'Written quote'],
+    customerLabel: 'Full Window Replacement (3+ windows) — Consultation',
+    summary:
+      'On-site assessment and quote to replace 3 or more brand-new windows — frames and glass included (not glass-only).',
+    includes: ['New window (frame + glass) assessment for each opening', 'Measurements', 'Written quote'],
     pricing: { display: 'Free consultation' },
     consultationFormat: 'on-site'
   },

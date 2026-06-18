@@ -1,57 +1,34 @@
 <script lang="ts">
   import { intakeStore } from '$lib/stores/intakeStore';
   import PhotoUploadMock from './PhotoUploadMock.svelte';
-  import type { PropertyType, SpecialInstructions, UploadedPhoto } from '$lib/types/intake';
+  import type { SpecialInstructions, UploadedPhoto } from '$lib/types/intake';
 
-  export let propertyType: PropertyType;
   export let special: SpecialInstructions;
   export let photos: UploadedPhoto[];
   export let photosRequired = false;
   export let showErrors = false;
 
-  const propertyOptions: PropertyType[] = [
-    'Residential',
-    'Commercial',
-    'New construction',
-    'Property management / multifamily',
-    'Other'
+  // Arrival windows fit business hours (Mon–Sat, 8am–5pm). "No preference" maps
+  // to an empty stored value so it reads cleanly in the booking summary.
+  const arrivalWindows = [
+    'No preference',
+    'First available',
+    'Morning (8am–11am)',
+    'Midday (11am–2pm)',
+    'Afternoon (2pm–5pm)',
+    'Weekend'
   ];
-
-  function selectProperty(option: PropertyType) {
-    intakeStore.setPropertyType(option);
-  }
 
   function update<K extends keyof SpecialInstructions>(field: K, raw: SpecialInstructions[K]) {
     intakeStore.updateSpecialInstructions({ [field]: raw } as Partial<SpecialInstructions>);
   }
 
   $: errors = {
-    propertyType: !propertyType,
     photos: photosRequired && photos.length === 0
   };
 </script>
 
 <div class="grid">
-  <section>
-    <h3>Property type</h3>
-    <div class="tiles">
-      {#each propertyOptions as option (option)}
-        <button
-          type="button"
-          class="tile"
-          class:active={propertyType === option}
-          on:click={() => selectProperty(option)}
-        >
-          <span class="dot" aria-hidden="true"></span>
-          <span>{option}</span>
-        </button>
-      {/each}
-    </div>
-    {#if showErrors && errors.propertyType}
-      <p class="error">Please pick a property type</p>
-    {/if}
-  </section>
-
   <section>
     <h3>Access & special instructions</h3>
     <div class="row two">
@@ -86,13 +63,15 @@
     </label>
     <div>
       <label for="preferredWindow">Preferred appointment window</label>
-      <input
+      <select
         id="preferredWindow"
-        type="text"
-        placeholder="Mornings, afternoons after 2pm, weekends..."
         value={special.preferredWindow}
-        on:input={(event) => update('preferredWindow', event.currentTarget.value)}
-      />
+        on:change={(event) => update('preferredWindow', event.currentTarget.value)}
+      >
+        {#each arrivalWindows as window (window)}
+          <option value={window === 'No preference' ? '' : window}>{window}</option>
+        {/each}
+      </select>
     </div>
     <div>
       <label for="otherNotes">Anything else our team should know?</label>
@@ -146,49 +125,6 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-  }
-
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.55rem;
-  }
-
-  .tile {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.75rem 0.9rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    box-shadow: var(--shadow-sm);
-    font-weight: 600;
-    color: var(--color-text);
-    text-align: left;
-    transition: border-color 0.15s ease, background 0.15s ease;
-  }
-
-  .tile:hover {
-    border-color: var(--color-primary);
-  }
-
-  .tile.active {
-    border-color: var(--color-primary);
-    background: var(--color-primary-soft);
-  }
-
-  .dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 2px solid var(--color-border-strong);
-    flex-shrink: 0;
-  }
-
-  .tile.active .dot {
-    border-color: var(--color-primary);
-    background: var(--color-primary);
   }
 
   .row.two {
@@ -246,7 +182,6 @@
   }
 
   @media (max-width: 520px) {
-    .tiles,
     .row.two {
       grid-template-columns: 1fr;
     }

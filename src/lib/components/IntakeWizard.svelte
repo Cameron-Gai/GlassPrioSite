@@ -9,6 +9,7 @@
   import PhaseStepper from './PhaseStepper.svelte';
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PriorityUpgradeAsk from './PriorityUpgradeAsk.svelte';
+  import PropertyTypeForm from './PropertyTypeForm.svelte';
   import IssueDetailsForm from './IssueDetailsForm.svelte';
   import SiteAccessForm from './SiteAccessForm.svelte';
   import CustomerInfoForm from './CustomerInfoForm.svelte';
@@ -19,6 +20,7 @@
 
   const stepLabels: Record<WizardStep, string> = {
     triage: 'Tell us what you need',
+    'property-type': 'Property type',
     'priority-upgrade': 'Choose your timing',
     issue: "What's going on",
     site: 'Property & access',
@@ -31,19 +33,15 @@
 
   function isStepValid(state: typeof $intakeStore): boolean {
     switch (state.step) {
+      case 'property-type':
+        return !!state.propertyType;
       case 'issue':
-        return (
-          state.issueDetails.serviceLocation.trim() !== '' &&
-          state.issueDetails.description.trim().length >= 5 &&
-          state.issueDetails.happenedAt.trim() !== '' &&
-          (!state.issueDetails.ladder.required || state.issueDetails.ladder.story.trim() !== '')
-        );
+        // All issue-step fields are optional by design — a nudge encourages
+        // detail, but nothing here blocks the customer from continuing.
+        return true;
       case 'site': {
         const photosRequired = state.selectedJobType?.consultationFormat === 'virtual';
-        return (
-          !!state.propertyType &&
-          (!photosRequired || state.issueDetails.photos.length > 0)
-        );
+        return !photosRequired || state.issueDetails.photos.length > 0;
       }
       case 'contact':
         return (
@@ -126,6 +124,15 @@
   <div class="step-body">
     {#if state.step === 'triage' && node}
       <QuestionCard {node} onSelect={(option) => intakeStore.selectOption(option)} />
+    {:else if state.step === 'property-type'}
+      <header class="screen-head">
+        <h2>What type of property is this for?</h2>
+        <p>This helps us send the right team and pricing.</p>
+      </header>
+      <PropertyTypeForm value={state.propertyType} />
+      {#if attempted && !isStepValid(state)}
+        <p class="form-error">Please pick a property type to continue.</p>
+      {/if}
     {:else if state.step === 'priority-upgrade'}
       <PriorityUpgradeAsk />
     {:else if state.step === 'issue'}
@@ -133,14 +140,13 @@
         <h2>Tell us what's going on</h2>
         <p>Be as specific as you can — it helps us route the right person.</p>
       </header>
-      <IssueDetailsForm value={state.issueDetails} job={state.selectedJobType} showErrors={attempted} />
+      <IssueDetailsForm value={state.issueDetails} job={state.selectedJobType} />
     {:else if state.step === 'site'}
       <header class="screen-head">
-        <h2>Property and access</h2>
+        <h2>Access &amp; photos</h2>
         <p>This helps our team get to you and triage faster.</p>
       </header>
       <SiteAccessForm
-        propertyType={state.propertyType}
         special={state.specialInstructions}
         photos={state.issueDetails.photos}
         {photosRequired}

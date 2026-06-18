@@ -28,9 +28,13 @@
       <div>
         <dt>Ladder</dt>
         <dd>
-          {state.issueDetails.ladder.required
-            ? `Yes — ${state.issueDetails.ladder.story || 'height not noted'}`
-            : 'Not required'}
+          {#if state.issueDetails.ladder.access === 'yes'}
+            Yes — {state.issueDetails.ladder.story || 'height not noted'}
+          {:else if state.issueDetails.ladder.access === 'unsure'}
+            Unsure
+          {:else}
+            Not required
+          {/if}
         </dd>
       </div>
       <div>

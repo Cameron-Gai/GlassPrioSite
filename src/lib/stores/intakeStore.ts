@@ -26,6 +26,7 @@ import type {
 
 export type WizardStep =
   | 'triage'
+  | 'property-type'
   | 'priority-upgrade'
   | 'issue'
   | 'site'
@@ -71,11 +72,17 @@ export interface IntakeState {
   confirmationNumber: string | null;
   submitting: boolean;
   submitError: string | null;
+  /** Returning-customer autofill state (greet + confirm flow). */
+  returning: {
+    status: 'idle' | 'checking' | 'found' | 'applied' | 'none';
+    firstName: string | null;
+  };
 }
 
 /** All steps that can appear in the wizard, in their natural progression order. */
 export const STEP_ORDER: WizardStep[] = [
   'triage',
+  'property-type',
   'priority-upgrade',
   'issue',
   'site',
@@ -93,7 +100,7 @@ export interface PhaseDef {
 }
 
 export const PHASES: PhaseDef[] = [
-  { id: 'tell-us', label: 'Tell us', steps: ['triage', 'priority-upgrade'] },
+  { id: 'tell-us', label: 'Tell us', steps: ['triage', 'property-type', 'priority-upgrade'] },
   { id: 'details', label: 'Details', steps: ['issue', 'site'] },
   { id: 'you', label: 'You', steps: ['contact', 'address'] },
   { id: 'finish', label: 'Finish', steps: ['scheduling', 'review'] }
@@ -120,7 +127,7 @@ function initialState(): IntakeState {
       isSecure: true,
       hasBrokenGlass: false,
       hasWaterOrWeatherEntry: false,
-      ladder: { required: false, story: '' },
+      ladder: { access: 'no', story: '' },
       photos: [],
       categoryDetails: {
         storefrontScope: '',
@@ -144,7 +151,8 @@ function initialState(): IntakeState {
     paymentAuthorized: false,
     confirmationNumber: null,
     submitting: false,
-    submitError: null
+    submitError: null,
+    returning: { status: 'idle', firstName: null }
   };
 }
 
@@ -164,10 +172,10 @@ function applyEmergencyRoute(state: IntakeState): IntakeState {
   };
 }
 
-function postRouteStep(state: IntakeState): WizardStep {
-  if (state.isEmergency) return 'issue';
-  if (canUpgradeToPriority(state.selectedJobType)) return 'priority-upgrade';
-  return 'issue';
+function postRouteStep(_state: IntakeState): WizardStep {
+  // Property type is asked first, right after the service is routed. The linear
+  // advance from there skips priority-upgrade when it doesn't apply.
+  return 'property-type';
 }
 
 function createIntakeStore() {
@@ -298,7 +306,95 @@ function createIntakeStore() {
   }
 
   function updateCustomer(patch: Partial<CustomerInfo>) {
-    store.update((state) => ({ ...state, customer: { ...state.customer, ...patch } }));
+    store.update((state) => {
+      // Editing phone/email after a prior result invalidates it — re-arm the lookup.
+      const resets = 'phone' in patch || 'email' in patch;
+      return {
+        ...state,
+        customer: { ...state.customer, ...patch },
+        returning: resets ? { status: 'idle', firstName: null } : state.returning
+      };
+    });
+  }
+
+  const PHONE_OK = /^[0-9+\-\s().]{7,}$/;
+  const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  /** Step 1: when phone + email are valid, quietly check for a returning customer. */
+  async function lookupReturningCustomer() {
+    const state = get(store);
+    const phone = state.customer.phone.trim();
+    const email = state.customer.email.trim();
+    if (!PHONE_OK.test(phone) || !EMAIL_OK.test(email)) return;
+    if (state.returning.status === 'checking' || state.returning.status === 'applied') return;
+
+    store.update((s) => ({ ...s, returning: { status: 'checking', firstName: null } }));
+    try {
+      const res = await fetch('/api/customer-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, email })
+      });
+      const data = (await res.json()) as { matched: boolean; firstName?: string | null };
+      // Guard against a stale response after the user kept typing.
+      const now = get(store);
+      if (now.customer.phone.trim() !== phone || now.customer.email.trim() !== email) return;
+      store.update((s) => ({
+        ...s,
+        returning: data.matched
+          ? { status: 'found', firstName: data.firstName ?? null }
+          : { status: 'none', firstName: null }
+      }));
+    } catch {
+      store.update((s) => ({ ...s, returning: { status: 'none', firstName: null } }));
+    }
+  }
+
+  /** Step 2: customer opted in — fetch and apply name + address. */
+  async function applyReturningCustomer() {
+    const state = get(store);
+    const phone = state.customer.phone.trim();
+    const email = state.customer.email.trim();
+    try {
+      const res = await fetch('/api/customer-prefill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, email })
+      });
+      const data = (await res.json()) as {
+        matched: boolean;
+        prefill?: {
+          firstName: string;
+          lastName: string;
+          address: { street: string; city: string; state: string; zip: string } | null;
+        };
+      };
+      if (!data.matched || !data.prefill) {
+        store.update((s) => ({ ...s, returning: { status: 'none', firstName: null } }));
+        return;
+      }
+      const p = data.prefill;
+      store.update((s) => ({
+        ...s,
+        customer: {
+          ...s.customer,
+          firstName: p.firstName || s.customer.firstName,
+          lastName: p.lastName || s.customer.lastName
+        },
+        address: p.address ? { ...s.address, ...p.address } : s.address,
+        // Address may have changed the ZIP — drop any stale fee/authorization.
+        feeQuote: p.address ? null : s.feeQuote,
+        paymentIntentId: p.address ? null : s.paymentIntentId,
+        paymentAuthorized: p.address ? false : s.paymentAuthorized,
+        returning: { status: 'applied', firstName: p.firstName || s.returning.firstName }
+      }));
+    } catch {
+      store.update((s) => ({ ...s, returning: { status: 'none', firstName: null } }));
+    }
+  }
+
+  function dismissReturningCustomer() {
+    store.update((s) => ({ ...s, returning: { status: 'none', firstName: null } }));
   }
 
   function updateAddress(patch: Partial<AddressInfo>) {
@@ -471,6 +567,9 @@ function createIntakeStore() {
     goBack,
     updateCustomer,
     updateAddress,
+    lookupReturningCustomer,
+    applyReturningCustomer,
+    dismissReturningCustomer,
     setFeeQuote,
     setPaymentAuthorized,
     resetPayment,
