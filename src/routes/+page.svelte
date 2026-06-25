@@ -7,25 +7,27 @@
 </script>
 
 <svelte:head>
-  <title>Request Glass Service</title>
+  <title>Glass Doctor — Request Service</title>
   <meta
     name="description"
-    content="Request glass, window, door, or hardware service. Urgent issues are dispatched the same day."
+    content="Glass Doctor — request glass, window, door, or hardware service. Urgent issues are dispatched the same day."
   />
 </svelte:head>
 
 <div class="page">
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4h7v7H4z" />
-          <path d="M13 4h7v7h-7z" opacity="0.55" />
-          <path d="M4 13h7v7H4z" opacity="0.7" />
-          <path d="M13 13h7v7h-7z" opacity="0.4" />
-        </svg>
+      <span class="reflective-ray" aria-hidden="true">
+        <span class="ray ray-red"></span>
+        <span class="ray ray-navy"></span>
+        <span class="ray ray-blue"></span>
       </span>
-      <span class="brand-name">Glass Service</span>
+      <span class="lockup">
+        <span class="wordmark">
+          <span class="wm-glass">GLASS</span><span class="wm-doctor">DOCTOR</span><span class="wm-rx">Rx</span><span class="wm-reg">®</span>
+        </span>
+        <span class="brand-sub">a Neighborly company</span>
+      </span>
     </div>
     <span class="status" data-open={openNow}>
       <span class="status-dot" aria-hidden="true"></span>
@@ -35,7 +37,7 @@
 
   <main>
     <section class="hero">
-      <p class="eyebrow">Service request</p>
+      <p class="eyebrow">We Fix Your Panes!®</p>
       <h1>Tell us what you need.<br /><span class="muted">We’ll route it the right way.</span></h1>
       <p class="lede">
         A few quick questions are all it takes. Emergencies are dispatched the same day; everything
@@ -93,22 +95,79 @@
     gap: 0.6rem;
   }
 
-  .brand-mark {
+  /* Reflective Ray brand artifact — angled tri-color stripes from the logo.
+     Angle is fixed; color order may vary per the guidelines. */
+  .reflective-ray {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    background: var(--color-primary-gradient);
-    color: #fff;
-    border-radius: 11px;
-    box-shadow: var(--shadow-sm);
+    gap: 3px;
+    height: 30px;
   }
 
-  .brand-name {
-    font-weight: 700;
-    letter-spacing: -0.015em;
-    font-size: 1.02rem;
+  .ray {
+    display: block;
+    width: 7px;
+    height: 100%;
+    transform: skewX(-18deg);
+    border-radius: 1px;
+  }
+
+  .ray-red {
+    background: var(--color-red);
+  }
+
+  .ray-navy {
+    background: var(--color-primary);
+  }
+
+  .ray-blue {
+    background: var(--color-light-blue);
+  }
+
+  .lockup {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.05;
+  }
+
+  .wordmark {
+    font-weight: 800;
+    font-size: 1.32rem;
+    letter-spacing: -0.02em;
+    display: inline-flex;
+    align-items: baseline;
+  }
+
+  .wm-glass {
+    color: var(--color-primary);
+  }
+
+  .wm-doctor {
+    color: var(--color-red);
+    margin-left: 0.12em;
+  }
+
+  .wm-rx {
+    color: var(--color-red);
+    font-size: 0.62em;
+    align-self: flex-end;
+    transform: translateY(0.12em);
+    margin-left: 0.02em;
+  }
+
+  .wm-reg {
+    color: var(--color-red);
+    font-size: 0.42em;
+    align-self: flex-start;
+    transform: translateY(0.15em);
+  }
+
+  .brand-sub {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--color-muted);
+    margin-top: 2px;
   }
 
   .status {

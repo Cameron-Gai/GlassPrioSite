@@ -15,6 +15,8 @@ export interface BookingFeeContext {
   paymentIntentId: string | null;
   /** Diagnostic reason when the OSC was not collected online. */
   flag: string;
+  /** Resolved ServiceTitan business-unit id for the ZIP + customer type (pre-fills the booking). */
+  businessUnitId?: number | null;
 }
 
 /**
@@ -103,10 +105,15 @@ function buildContacts(payload: IntakePayload): STBookingContact[] {
   return contacts;
 }
 
-function inferCustomerType(payload: IntakePayload): 'Residential' | 'Commercial' {
-  if (payload.propertyType === 'Commercial') return 'Commercial';
-  if (payload.propertyType === 'Property management / multifamily') return 'Commercial';
+/** Map a property type to the ServiceTitan customer type. Business & multi-family are Commercial. */
+export function customerTypeForPropertyType(propertyType: IntakePayload['propertyType']): 'Residential' | 'Commercial' {
+  if (propertyType === 'Business') return 'Commercial';
+  if (propertyType === 'Multi-family') return 'Commercial';
   return 'Residential';
+}
+
+function inferCustomerType(payload: IntakePayload): 'Residential' | 'Commercial' {
+  return customerTypeForPropertyType(payload.propertyType);
 }
 
 /**
@@ -124,19 +131,19 @@ function toAscii(text: string): string {
     .replace(/[^\x20-\x7E\n]/g, '');
 }
 
-/** One-line on-site-charge summary for the CSR (always present in the booking notes). */
+/** One-line on-site consultation charge summary for the CSR (always present in the booking notes). */
 function feeLine(feeCtx?: BookingFeeContext): string | null {
   if (!feeCtx) return null;
   const zone = feeCtx.zoneName ? ` (Zone ${feeCtx.zoneName})` : '';
   if (feeCtx.serviced && feeCtx.osc > 0) {
     return feeCtx.paid
-      ? `On-site charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}).`
-      : `On-site charge: $${feeCtx.osc}${zone} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
+      ? `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}).`
+      : `On-site consultation charge: $${feeCtx.osc}${zone} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
   }
   if (!feeCtx.serviced) {
-    return `On-site charge: ZIP not found in the service-area map - office to confirm coverage and quote the fee.`;
+    return `On-site consultation charge: ZIP not found in the service-area map - office to confirm coverage and quote the fee.`;
   }
-  return `On-site charge: none for this service.`;
+  return `On-site consultation charge: none for this service.`;
 }
 
 /** Structured key/value pairs mirrored onto the booking (toggle with SERVICETITAN_BOOKING_EXTERNALDATA). */
@@ -172,6 +179,16 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   if (payload.routing.priorityUpgrade) {
     lines.push('Customer accepted the Priority Service upgrade ($399).');
   }
+  // Property type + type-specific details and the submitter's role.
+  if (payload.propertyType) {
+    const pd = payload.propertyDetails;
+    const name = payload.propertyType === 'Business' ? pd.businessName
+      : payload.propertyType === 'Multi-family' ? pd.complexName : '';
+    const bits: string[] = [payload.propertyType];
+    if (name) bits.push(name);
+    if (pd.role) bits.push(`contact is ${pd.role}`);
+    lines.push(`Property: ${bits.join(' - ')}`);
+  }
   if (payload.issueDetails.serviceLocation) {
     lines.push(`Location on property: ${payload.issueDetails.serviceLocation}`);
   }
@@ -182,10 +199,12 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   if (payload.issueDetails.happenedAt) {
     lines.push(`When: ${payload.issueDetails.happenedAt}`);
   }
-  if (payload.issueDetails.ladder.access === 'yes') {
-    lines.push(`Ladder required: ${payload.issueDetails.ladder.story || 'height not noted'}`);
-  } else if (payload.issueDetails.ladder.access === 'unsure') {
-    lines.push('Ladder access: customer unsure — check exterior photo if provided.');
+  const wa = payload.issueDetails.windowAccess;
+  if (wa.floors) lines.push(`Window floor(s): ${wa.floors}`);
+  if (wa.blocked === 'yes') {
+    lines.push(`Access blocked: ${wa.blockedNotes || 'yes (details not noted)'}`);
+  } else if (wa.blocked === 'unsure') {
+    lines.push('Access blocked: customer unsure - check photo if provided.');
   }
   const cd = payload.issueDetails.categoryDetails;
   if (cd.storefrontScope) lines.push(`Storefront scope: ${cd.storefrontScope}`);
@@ -201,6 +220,10 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   if (si.hasDog) access.push('Dog on property');
   if (si.parkingNotes) access.push(`Parking: ${si.parkingNotes}`);
   if (si.preferredWindow) access.push(`Preferred window: ${si.preferredWindow}`);
+  if (payload.onSiteContact.differs) {
+    const oc = payload.onSiteContact;
+    access.push(`On-site contact: ${oc.name || 'name not given'}${oc.phone ? ` (${oc.phone})` : ''}`);
+  }
   if (si.other) access.push(`Notes: ${si.other}`);
   if (access.length) {
     lines.push('');
@@ -259,6 +282,7 @@ export async function submitIntakeToServiceTitan(
     isSendConfirmationEmail: false,
     ...(config.campaignId !== null ? { campaignId: config.campaignId } : {}),
     ...(resolution.id !== null ? { jobTypeId: resolution.id } : {}),
+    ...(feeCtx?.businessUnitId ? { businessUnitId: feeCtx.businessUnitId } : {}),
     ...(externalData ? { externalData } : {})
   };
 

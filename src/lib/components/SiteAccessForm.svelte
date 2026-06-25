@@ -23,6 +23,8 @@
     intakeStore.updateSpecialInstructions({ [field]: raw } as Partial<SpecialInstructions>);
   }
 
+  $: onSite = $intakeStore.onSiteContact;
+
   $: errors = {
     photos: photosRequired && photos.length === 0
   };
@@ -83,6 +85,41 @@
         on:input={(event) => update('other', event.currentTarget.value)}
       ></textarea>
     </div>
+
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={onSite.differs}
+        on:change={(event) => intakeStore.updateOnSiteContact({ differs: event.currentTarget.checked })}
+      />
+      <span>Someone other than me will be on-site</span>
+    </label>
+    {#if onSite.differs}
+      <div class="row two">
+        <div>
+          <label for="onSiteName">On-site contact name</label>
+          <input
+            id="onSiteName"
+            type="text"
+            autocomplete="off"
+            placeholder="Full name"
+            value={onSite.name}
+            on:input={(event) => intakeStore.updateOnSiteContact({ name: event.currentTarget.value })}
+          />
+        </div>
+        <div>
+          <label for="onSitePhone">On-site contact phone</label>
+          <input
+            id="onSitePhone"
+            type="tel"
+            autocomplete="off"
+            placeholder="(555) 555-5555"
+            value={onSite.phone}
+            on:input={(event) => intakeStore.updateOnSiteContact({ phone: event.currentTarget.value })}
+          />
+        </div>
+      </div>
+    {/if}
   </section>
 
   <section>

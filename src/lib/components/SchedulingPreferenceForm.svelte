@@ -9,6 +9,7 @@
     'Today',
     'Tomorrow',
     'This week',
+    'Next week',
     'Flexible'
   ];
 

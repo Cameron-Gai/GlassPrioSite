@@ -26,14 +26,18 @@
         <dd class="multiline">{state.issueDetails.description || '—'}</dd>
       </div>
       <div>
-        <dt>Ladder</dt>
+        <dt>Window floor(s)</dt>
+        <dd>{state.issueDetails.windowAccess.floors || '—'}</dd>
+      </div>
+      <div>
+        <dt>Access blocked</dt>
         <dd>
-          {#if state.issueDetails.ladder.access === 'yes'}
-            Yes — {state.issueDetails.ladder.story || 'height not noted'}
-          {:else if state.issueDetails.ladder.access === 'unsure'}
+          {#if state.issueDetails.windowAccess.blocked === 'yes'}
+            Yes — {state.issueDetails.windowAccess.blockedNotes || 'details not noted'}
+          {:else if state.issueDetails.windowAccess.blocked === 'unsure'}
             Unsure
           {:else}
-            Not required
+            No
           {/if}
         </dd>
       </div>
@@ -52,6 +56,15 @@
     <h3>Property & access</h3>
     <dl>
       <div><dt>Property type</dt><dd>{state.propertyType || '—'}</dd></div>
+      {#if state.propertyType === 'Business' && state.propertyDetails.businessName}
+        <div><dt>Business</dt><dd>{state.propertyDetails.businessName}</dd></div>
+      {/if}
+      {#if state.propertyType === 'Multi-family' && state.propertyDetails.complexName}
+        <div><dt>Community</dt><dd>{state.propertyDetails.complexName}</dd></div>
+      {/if}
+      {#if state.propertyDetails.role}
+        <div><dt>Your role</dt><dd>{state.propertyDetails.role}</dd></div>
+      {/if}
       <div><dt>Gate code</dt><dd>{state.specialInstructions.gateCode || '—'}</dd></div>
       <div>
         <dt>Dog on site</dt>
@@ -59,6 +72,12 @@
       </div>
       <div><dt>Parking</dt><dd>{state.specialInstructions.parkingNotes || '—'}</dd></div>
       <div><dt>Preferred window</dt><dd>{state.specialInstructions.preferredWindow || '—'}</dd></div>
+      {#if state.onSiteContact.differs}
+        <div class="full">
+          <dt>On-site contact</dt>
+          <dd>{state.onSiteContact.name || '—'}{state.onSiteContact.phone ? ` · ${state.onSiteContact.phone}` : ''}</dd>
+        </div>
+      {/if}
       {#if state.specialInstructions.other}
         <div class="full"><dt>Notes</dt><dd class="multiline">{state.specialInstructions.other}</dd></div>
       {/if}

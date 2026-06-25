@@ -10,23 +10,37 @@
   --color-border-strong: #b8c6db;
   --color-divider: #e3eaf3;
 
-  --color-text: #0c1a30;
-  --color-text-strong: #06122a;
+  --color-text: #1a2236;
+  /* Headlines render in brand Primary Blue per the Glass Doctor guide. */
+  --color-text-strong: #06038d;
   --color-muted: #56657d;
   --color-subtle: #8395ad;
 
-  --color-primary: #0a4d8c;
-  --color-primary-hover: #083d70;
-  --color-primary-soft: #e4eef8;
-  --color-primary-soft-strong: #c9dcef;
-  --color-primary-gradient: linear-gradient(135deg, #0a4d8c 0%, #1a72c6 100%);
+  /* ── Glass Doctor brand palette (per Brand Guidelines) ───────────────────
+     Primary = Blue, Supporting = Red, Secondary = Light Blue. No green.
+     Brand red #e4002b is not ADA-compliant; on web we use #ff3839.          */
+  --color-primary: #06038d; /* Primary Blue — Pantone 2738C */
+  --color-primary-hover: #04026a;
+  --color-primary-soft: #e7e7f5;
+  --color-primary-soft-strong: #c7c6ea;
+  --color-primary-gradient: linear-gradient(135deg, #06038d 0%, #1a3fb8 100%);
+  --color-navy: #06038d; /* the "GLASS" blue in the wordmark == primary */
 
-  --color-accent: #0fa97c;
-  --color-accent-bg: #e2f5ec;
+  --color-red: #e4002b; /* Supporting Red — Pantone 185C */
+  --color-red-web: #ff3839; /* ADA web red */
+  --color-red-soft: #ffe6e8;
 
-  --color-emergency: #c0392b;
-  --color-emergency-bg: #fdecea;
-  --color-emergency-soft: #f5c3bc;
+  --color-light-blue: #60afe6; /* Secondary — Pantone 292C */
+  --color-light-blue-soft: #e7f3fc;
+
+  /* Semantic "success/positive" reuses brand blue + light-blue (no off-brand green). */
+  --color-accent: #06038d;
+  --color-accent-bg: #e7f3fc;
+
+  /* Urgent/emergency uses the brand red family. */
+  --color-emergency: #e4002b;
+  --color-emergency-bg: #ffe6e8;
+  --color-emergency-soft: #ffc4ca;
 
   --color-warning: #a36100;
   --color-warning-bg: #fff4dc;
@@ -41,11 +55,13 @@
   --shadow-lg: 0 24px 60px rgba(10, 30, 60, 0.14);
   --shadow-glass: 0 30px 80px rgba(10, 50, 110, 0.16);
 
-  --ring-focus: 0 0 0 4px rgba(10, 77, 140, 0.2);
+  --ring-focus: 0 0 0 4px rgba(6, 3, 141, 0.22);
 
+  /* Brand typeface is Gotham (licensed). Montserrat is the closest free web
+     substitute until the official Gotham web fonts are licensed + self-hosted. */
   --font-display:
-    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    sans-serif;
+    'Montserrat', 'Gotham', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
   --font-body: var(--font-display);
 }
 
@@ -59,9 +75,9 @@ body {
   padding: 0;
   background-color: var(--color-bg);
   background-image:
-    radial-gradient(1100px 700px at 80% -10%, rgba(26, 114, 198, 0.16), transparent 65%),
-    radial-gradient(900px 700px at -10% 10%, rgba(15, 169, 124, 0.1), transparent 60%),
-    linear-gradient(180deg, #eef4fc 0%, #e6eef9 480px, #eef3fb 900px);
+    radial-gradient(1100px 700px at 80% -10%, rgba(96, 175, 230, 0.18), transparent 65%),
+    radial-gradient(900px 700px at -10% 10%, rgba(6, 3, 141, 0.07), transparent 60%),
+    linear-gradient(180deg, #f6f8fc 0%, #eef2f8 480px, #f4f6fb 900px);
   background-attachment: fixed;
   color: var(--color-text);
   font-family: var(--font-body);

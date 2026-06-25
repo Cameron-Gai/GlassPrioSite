@@ -50,6 +50,12 @@ interface STProviderTag {
   active?: boolean;
 }
 
+interface STBusinessUnit {
+  id: number;
+  name: string;
+  active?: boolean;
+}
+
 function buildDiscoveryConfig(): ServiceTitanConfig | null {
   const tenantId = env.SERVICETITAN_TENANT_ID;
   const appKey = env.SERVICETITAN_APP_KEY;
@@ -141,12 +147,13 @@ export const GET: RequestHandler = async ({ url }) => {
     }
   };
 
-  const [stJobTypes, campaigns, providerTags] = await Promise.all([
+  const [stJobTypes, campaigns, providerTags, businessUnits] = await Promise.all([
     safe('jobTypes', () => fetchAll<STJobType>(config, 'jpm/v2', 'job-types')),
     safe('campaigns', () => fetchAll<STCampaign>(config, 'marketing/v2', 'campaigns')),
     safe('bookingProviderTags', () =>
       fetchAll<STProviderTag>(config, 'crm/v2', 'booking-provider-tags')
-    )
+    ),
+    safe('businessUnits', () => fetchAll<STBusinessUnit>(config, 'settings/v2', 'business-units'))
   ]);
 
   // Match every public intake job type name against the tenant's job types.
@@ -201,7 +208,8 @@ export const GET: RequestHandler = async ({ url }) => {
     counts: {
       stJobTypes: stJobTypes.length,
       campaigns: campaigns.length,
-      bookingProviderTags: providerTags.length
+      bookingProviderTags: providerTags.length,
+      businessUnits: businessUnits.length
     },
     errors,
     // ── Paste these into Railway ────────────────────────────────────────────
@@ -219,6 +227,11 @@ export const GET: RequestHandler = async ({ url }) => {
     unmatchedIntakeJobTypes: unmatched,
     allStJobTypes: stJobTypes.map((jt) => ({ id: jt.id, name: jt.name, active: jt.active ?? null })),
     allCampaigns: activeCampaigns,
+    // Build SERVICETITAN_BUSINESS_UNIT_IDS from these (group by Seattle/Tacoma →
+    // residential/commercial/interior).
+    allBusinessUnits: businessUnits
+      .filter((b) => b?.active !== false)
+      .map((b) => ({ id: b.id, name: b.name })),
     note:
       'Temporary helper. After copying values into Railway, unset ADMIN_DISCOVERY_TOKEN (or delete src/routes/api/admin/st-discovery).'
   });

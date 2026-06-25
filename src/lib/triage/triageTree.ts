@@ -305,25 +305,28 @@ export const triageTree: Record<string, TriageNode> = {
         id: 'shower-only',
         label: 'Shower glass',
         helperText: 'Frameless, semi-frameless, or framed',
-        routeJobTypeName: 'Custom Shower Enclosure Or Mirrors - Consultation'
+        routeJobTypeName: 'Custom Shower Enclosure - Consultation'
       },
       {
         id: 'mirror-only',
         label: 'Mirror',
         helperText: 'Wall, vanity, or gym mirror',
-        routeJobTypeName: 'Custom Shower Enclosure Or Mirrors - Consultation'
+        routeJobTypeName: 'Custom Mirrors - Consultation'
       },
       {
+        // No combined shower+mirror job type exists (split for ACP); the shower
+        // enclosure consultation is the broader scope and the consultant covers
+        // mirrors on the same virtual visit.
         id: 'shower-mirror-both',
         label: 'Both',
-        routeJobTypeName: 'Custom Shower Enclosure Or Mirrors - Consultation'
+        routeJobTypeName: 'Custom Shower Enclosure - Consultation'
       }
     ]
   },
 
   hardware: {
     id: 'hardware',
-    question: 'Is the property residential or commercial?',
+    question: 'Is the property residential or business?',
     helperText: 'The process is the same for both — we just file the job under the right category.',
     layout: 'list',
     options: [
@@ -334,7 +337,7 @@ export const triageTree: Record<string, TriageNode> = {
       },
       {
         id: 'hardware-commercial',
-        label: 'Commercial',
+        label: 'Business',
         routeJobTypeName: 'Hardware Service Consultation - Commercial'
       },
       {

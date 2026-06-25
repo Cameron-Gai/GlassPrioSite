@@ -18,6 +18,9 @@
   let stripe: Stripe | null = null;
   let elements: StripeElements | null = null;
   let cardNode: HTMLDivElement;
+  /** The PaymentIntent id we created server-side — used as the authoritative id
+   *  regardless of what confirmPayment echoes back. */
+  let createdIntentId = '';
 
   const zip = state.address.zip.trim();
   const jobTypeName = state.selectedJobType?.name ?? '';
@@ -28,9 +31,9 @@
       return 'We could not match your ZIP to a service area. You can still submit — our office will confirm coverage and any fee when scheduling.';
     }
     if (flag === 'payment-not-configured' || amt > 0) {
-      return `An on-site charge of ${money(amt)} applies for your area. Our office will collect it when scheduling.`;
+      return `An on-site consultation charge of ${money(amt)} applies for your area. Our office will collect it when scheduling.`;
     }
-    return 'No on-site charge applies for this service.';
+    return 'No on-site consultation charge applies for this service.';
   }
 
   async function init() {
@@ -66,6 +69,7 @@
         return;
       }
 
+      createdIntentId = data.paymentIntentId ?? '';
       stripe = await loadStripe(data.publishableKey);
       if (!stripe) throw new Error('Could not load the payment form');
       elements = stripe.elements({ clientSecret: data.clientSecret, appearance: { theme: 'stripe' } });
@@ -78,7 +82,7 @@
       console.error('[PaymentStep] setup failed', err);
       intakeStore.setFeeQuote({ serviced: false, osc: amount, currency, zoneName, flag: 'fee-setup-failed', paymentRequired: false });
       infoText =
-        'We could not set up online payment right now. You can still submit — our office will confirm any on-site charge when scheduling.';
+        'We could not set up online payment right now. You can still submit — our office will confirm any on-site consultation charge when scheduling.';
       phase = 'info';
     }
   }
@@ -88,6 +92,7 @@
     phase = 'submitting';
     payError = '';
     const { error, paymentIntent } = await stripe.confirmPayment({ elements, redirect: 'if_required' });
+    console.log('[PaymentStep] confirmPayment →', { error: error?.message, status: paymentIntent?.status, id: paymentIntent?.id });
     if (error) {
       payError = error.message ?? 'Payment failed. Please check your card details.';
       phase = 'card';
@@ -98,7 +103,9 @@
       phase = 'card';
       return;
     }
-    intakeStore.setPaymentAuthorized(paymentIntent.id);
+    // Use the id we created server-side as the source of truth (falls back to
+    // confirmPayment's echo).
+    intakeStore.setPaymentAuthorized(paymentIntent.id || createdIntentId);
     const ok = await intakeStore.submit();
     if (!ok) {
       // The server releases the authorization hold when booking fails, so re-arm
@@ -115,7 +122,7 @@
 </script>
 
 <section class="checkout" aria-live="polite">
-  <h3>On-site charge</h3>
+  <h3>On-site consultation charge</h3>
 
   {#if phase === 'loading'}
     <p class="muted">Checking the charge for your area…</p>

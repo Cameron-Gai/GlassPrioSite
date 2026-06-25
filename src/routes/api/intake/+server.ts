@@ -5,10 +5,12 @@ import {
   getServiceTitanConfig,
   ServiceTitanError,
   submitIntakeToServiceTitan,
+  customerTypeForPropertyType,
   type BookingFeeContext
 } from '$lib/server/servicetitan';
 import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
 import { resolveFee } from '$lib/server/zoneFee';
+import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
 import { captureIntent, cancelIntent, getIntent, isStripeConfigured } from '$lib/server/payments/stripe';
 
 function isNonEmptyString(value: unknown): value is string {
@@ -84,8 +86,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
     console.error('[api/intake] photo storage failed — continuing without links', storageError);
   }
 
-  // Resolve the on-site charge for this ZIP + job type (fails soft to $0 + flag).
+  // Resolve the on-site charge + the ZIP's market from the zone map (fails soft
+  // to $0 + flag). The business unit is derived locally from the market +
+  // customer type + whether it's interior/architectural-glass work.
+  const customerType = customerTypeForPropertyType(payload.propertyType);
+  const interior = payload.selectedJobType.category === 'shower-mirror';
   const fee = await resolveFee(payload.address.zip, payload.selectedJobType.name);
+  const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior);
   const mustCollect = fee.serviced && fee.osc > 0 && isStripeConfigured();
 
   // Verify the Stripe authorization BEFORE booking. The amount is taken from the
@@ -94,6 +101,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   if (mustCollect) {
     const intentId = (payload.paymentIntentId ?? '').trim();
     if (!intentId) {
+      console.warn('[api/intake] fee due but no paymentIntentId in payload', { osc: fee.osc, zip: payload.address.zip });
       return json(
         { success: false, error: 'Payment is required for this service. Please complete payment and try again.' },
         { status: 402 }
@@ -129,7 +137,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     zoneName: fee.zoneName,
     paid: authorizedIntentId !== null,
     paymentIntentId: authorizedIntentId,
-    flag: fee.flag
+    flag: fee.flag,
+    businessUnitId
   };
 
   const config = getServiceTitanConfig();

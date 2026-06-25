@@ -16,7 +16,9 @@ import type {
   CustomerInfo,
   IntakePayload,
   IssueDetails,
-  LadderInfo,
+  WindowAccessInfo,
+  OnSiteContact,
+  PropertyDetails,
   PropertyType,
   SchedulingPreference,
   SelectedJobTypeSummary,
@@ -61,6 +63,8 @@ export interface IntakeState {
   customer: CustomerInfo;
   address: AddressInfo;
   propertyType: PropertyType;
+  propertyDetails: PropertyDetails;
+  onSiteContact: OnSiteContact;
   issueDetails: IssueDetails;
   specialInstructions: SpecialInstructions;
   schedulingPreference: SchedulingPreference;
@@ -79,14 +83,20 @@ export interface IntakeState {
   };
 }
 
-/** All steps that can appear in the wizard, in their natural progression order. */
+/**
+ * All steps that can appear in the wizard, in their natural progression order.
+ * Contact comes first (right after triage) so we capture the lead early and the
+ * returning-customer lookup can run before we decide whether to ask property
+ * type. Property type follows, and is skipped for recognized returning
+ * customers (see shouldSkipStep).
+ */
 export const STEP_ORDER: WizardStep[] = [
   'triage',
+  'contact',
   'property-type',
   'priority-upgrade',
   'issue',
   'site',
-  'contact',
   'address',
   'scheduling',
   'review',
@@ -100,9 +110,9 @@ export interface PhaseDef {
 }
 
 export const PHASES: PhaseDef[] = [
-  { id: 'tell-us', label: 'Tell us', steps: ['triage', 'property-type', 'priority-upgrade'] },
-  { id: 'details', label: 'Details', steps: ['issue', 'site'] },
-  { id: 'you', label: 'You', steps: ['contact', 'address'] },
+  { id: 'tell-us', label: 'Tell us', steps: ['triage'] },
+  { id: 'you', label: 'About you', steps: ['contact', 'property-type'] },
+  { id: 'details', label: 'Details', steps: ['priority-upgrade', 'issue', 'site', 'address'] },
   { id: 'finish', label: 'Finish', steps: ['scheduling', 'review'] }
 ];
 
@@ -120,6 +130,8 @@ function initialState(): IntakeState {
     customer: { firstName: '', lastName: '', phone: '', email: '' },
     address: { street: '', city: '', state: '', zip: '' },
     propertyType: '',
+    propertyDetails: { businessName: '', complexName: '', role: '' },
+    onSiteContact: { differs: false, name: '', phone: '' },
     issueDetails: {
       serviceLocation: '',
       description: '',
@@ -127,7 +139,7 @@ function initialState(): IntakeState {
       isSecure: true,
       hasBrokenGlass: false,
       hasWaterOrWeatherEntry: false,
-      ladder: { access: 'no', story: '' },
+      windowAccess: { floors: '', blocked: 'no', blockedNotes: '' },
       photos: [],
       categoryDetails: {
         storefrontScope: '',
@@ -173,9 +185,24 @@ function applyEmergencyRoute(state: IntakeState): IntakeState {
 }
 
 function postRouteStep(_state: IntakeState): WizardStep {
-  // Property type is asked first, right after the service is routed. The linear
-  // advance from there skips priority-upgrade when it doesn't apply.
-  return 'property-type';
+  // Contact comes first after the service is routed — capturing it early both
+  // recovers abandoned leads and lets the returning-customer lookup decide
+  // whether the property-type step is needed. The linear advance from there
+  // skips property-type (recognized returning customers) and priority-upgrade
+  // (when it doesn't apply).
+  return 'contact';
+}
+
+/**
+ * Steps that drop out of the linear flow depending on state:
+ *  - priority-upgrade: only for jobs that can be upgraded.
+ *  - property-type: skipped for recognized returning customers (we already have
+ *    their details on file, so we don't re-ask).
+ */
+function shouldSkipStep(step: WizardStep, state: IntakeState): boolean {
+  if (step === 'priority-upgrade') return !canUpgradeToPriority(state.selectedJobType);
+  if (step === 'property-type') return state.returning.status === 'applied';
+  return false;
 }
 
 function createIntakeStore() {
@@ -249,14 +276,13 @@ function createIntakeStore() {
   function advance() {
     store.update((state) => {
       const idx = STEP_ORDER.indexOf(state.step);
-      if (idx < 0 || idx === STEP_ORDER.length - 1) return state;
-      // Skip the priority upgrade step on returns if it's been answered already
-      // (priorityUpgrade=true or originalJobType set + we have a selectedJobType).
-      let nextStep = STEP_ORDER[idx + 1];
-      if (nextStep === 'priority-upgrade' && !canUpgradeToPriority(state.selectedJobType)) {
-        nextStep = STEP_ORDER[idx + 2] ?? nextStep;
-      }
-      return { ...state, step: nextStep };
+      if (idx < 0) return state;
+      // Walk forward past any steps that don't apply (handles consecutive skips,
+      // e.g. a returning customer whose job also can't be upgraded).
+      let nextIdx = idx + 1;
+      while (nextIdx < STEP_ORDER.length && shouldSkipStep(STEP_ORDER[nextIdx], state)) nextIdx += 1;
+      if (nextIdx >= STEP_ORDER.length) return state;
+      return { ...state, step: STEP_ORDER[nextIdx] };
     });
   }
 
@@ -279,9 +305,7 @@ function createIntakeStore() {
       const idx = STEP_ORDER.indexOf(state.step);
       for (let i = idx - 1; i >= 0; i -= 1) {
         const candidate = STEP_ORDER[i];
-        if (candidate === 'priority-upgrade' && !canUpgradeToPriority(state.selectedJobType)) {
-          continue;
-        }
+        if (shouldSkipStep(candidate, state)) continue;
         if (candidate === 'triage') {
           // Re-enter triage at the last decision; drop the route.
           const previous = state.triageHistory[state.triageHistory.length - 1] ?? TRIAGE_ROOT_ID;
@@ -421,7 +445,21 @@ function createIntakeStore() {
   }
 
   function setPropertyType(value: PropertyType) {
-    store.update((state) => ({ ...state, propertyType: value }));
+    // Switching type clears the type-specific details so a stale business/
+    // complex name or role can't carry over.
+    store.update((state) => ({
+      ...state,
+      propertyType: value,
+      propertyDetails: { businessName: '', complexName: '', role: '' }
+    }));
+  }
+
+  function updatePropertyDetails(patch: Partial<PropertyDetails>) {
+    store.update((state) => ({ ...state, propertyDetails: { ...state.propertyDetails, ...patch } }));
+  }
+
+  function updateOnSiteContact(patch: Partial<OnSiteContact>) {
+    store.update((state) => ({ ...state, onSiteContact: { ...state.onSiteContact, ...patch } }));
   }
 
   function updateIssueDetails(patch: Partial<IssueDetails>) {
@@ -431,12 +469,12 @@ function createIntakeStore() {
     }));
   }
 
-  function updateLadder(patch: Partial<LadderInfo>) {
+  function updateWindowAccess(patch: Partial<WindowAccessInfo>) {
     store.update((state) => ({
       ...state,
       issueDetails: {
         ...state.issueDetails,
-        ladder: { ...state.issueDetails.ladder, ...patch }
+        windowAccess: { ...state.issueDetails.windowAccess, ...patch }
       }
     }));
   }
@@ -505,10 +543,12 @@ function createIntakeStore() {
       customer: { ...state.customer },
       address: { ...state.address },
       propertyType: state.propertyType,
+      propertyDetails: { ...state.propertyDetails },
+      onSiteContact: { ...state.onSiteContact },
       answers: { ...state.answers },
       issueDetails: {
         ...state.issueDetails,
-        ladder: { ...state.issueDetails.ladder },
+        windowAccess: { ...state.issueDetails.windowAccess },
         photos: state.issueDetails.photos.map((p) => ({ ...p })),
         categoryDetails: { ...state.issueDetails.categoryDetails }
       },
@@ -574,8 +614,10 @@ function createIntakeStore() {
     setPaymentAuthorized,
     resetPayment,
     setPropertyType,
+    updatePropertyDetails,
+    updateOnSiteContact,
     updateIssueDetails,
-    updateLadder,
+    updateWindowAccess,
     updateSpecialInstructions,
     updateCategoryDetails,
     addPhoto,

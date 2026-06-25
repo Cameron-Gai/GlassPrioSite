@@ -5,6 +5,9 @@
   export let state: IntakeState;
   export let onReset: () => void;
 
+  const money = (n: number) => `$${n.toLocaleString()}`;
+  $: charge = state.feeQuote && state.feeQuote.osc > 0 ? state.feeQuote : null;
+
   $: nextSteps = buildNextSteps(state);
 
   function buildNextSteps(s: IntakeState): string[] {
@@ -88,6 +91,20 @@
       with updates.
     {/if}
   </p>
+
+  {#if charge}
+    <div class="charge">
+      <span class="charge-label">On-site consultation charge</span>
+      <span class="charge-amount">
+        {money(charge.osc)}
+        {#if state.paymentAuthorized}
+          <span class="paid">Paid</span>
+        {:else}
+          <span class="later">Collected at scheduling</span>
+        {/if}
+      </span>
+    </div>
+  {/if}
 
   <button type="button" class="reset" on:click={onReset}>Submit another request</button>
 </section>
@@ -181,6 +198,50 @@
     color: var(--color-muted);
     text-align: center;
     font-size: 0.92rem;
+  }
+
+  .charge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 0.85rem 1rem;
+  }
+
+  .charge-label {
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    font-weight: 700;
+  }
+
+  .charge-amount {
+    font-weight: 700;
+    font-size: 1.05rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .charge-amount .paid {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    background: var(--color-accent-bg);
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+  }
+
+  .charge-amount .later {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-muted);
   }
 
   .reset {

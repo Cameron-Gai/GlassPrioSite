@@ -60,15 +60,15 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: false
   },
   {
-    name: 'Custom Shower Enclosure Or Mirrors - Consultation',
+    name: 'Custom Shower Enclosure - Consultation',
     priority: 'Normal',
     duration: '45 minutes',
     category: 'shower-mirror',
     customerFacing: true,
     publicIntakeEnabled: true,
-    customerLabel: 'Custom Shower or Mirror — Virtual Consultation',
+    customerLabel: 'Custom Shower Enclosure — Virtual Consultation',
     summary:
-      "We start with a virtual consultation using your photos. For showers, we finalize once your tile work is complete.",
+      'We start with a virtual consultation using your photos. We finalize once your tile work is complete.',
     includes: [
       'Virtual consultation reviewing your photos',
       'Rough estimate provided remotely',
@@ -82,7 +82,37 @@ export const jobTypes: JobType[] = [
     consultationFormat: 'virtual'
   },
   {
-    name: 'Custom Shower Enclosure Or Mirrors - Installation',
+    name: 'Custom Shower Enclosure - Installation',
+    priority: 'Normal',
+    duration: '2 hours',
+    category: 'shower-mirror',
+    customerFacing: false,
+    publicIntakeEnabled: false
+  },
+  {
+    name: 'Custom Mirrors - Consultation',
+    priority: 'Normal',
+    duration: '45 minutes',
+    category: 'shower-mirror',
+    customerFacing: true,
+    publicIntakeEnabled: true,
+    customerLabel: 'Custom Mirror — Virtual Consultation',
+    summary:
+      'We start with a virtual consultation using your photos to scope a custom wall, vanity, or gym mirror.',
+    includes: [
+      'Virtual consultation reviewing your photos',
+      'Rough estimate provided remotely',
+      'On-site critical measurement once accepted'
+    ],
+    pricing: {
+      display: '$125 deposit on acceptance',
+      detail:
+        'A $125 non-refundable deposit is collected when you accept the rough estimate. It is applied toward the final invoice.'
+    },
+    consultationFormat: 'virtual'
+  },
+  {
+    name: 'Custom Mirrors - Installation',
     priority: 'Normal',
     duration: '2 hours',
     category: 'shower-mirror',

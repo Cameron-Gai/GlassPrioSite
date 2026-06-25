@@ -2,9 +2,8 @@ import type { JobPriority } from '$lib/data/jobTypes';
 
 export type PropertyType =
   | 'Residential'
-  | 'Commercial'
-  | 'New construction'
-  | 'Property management / multifamily'
+  | 'Business'
+  | 'Multi-family'
   | 'Other'
   | '';
 
@@ -13,8 +12,35 @@ export type SchedulingPreference =
   | 'Today'
   | 'Tomorrow'
   | 'This week'
+  | 'Next week'
   | 'Flexible'
   | '';
+
+/** Who the submitter is relative to the property (options depend on property type). */
+export type PropertyContactRole =
+  | ''
+  | 'Manager'
+  | 'Employee'
+  | 'Other'
+  | 'Maintenance'
+  | 'Tenant';
+
+/** Property-type-specific details collected on the property-type step. */
+export interface PropertyDetails {
+  /** Business / company name (when property type is Business). */
+  businessName: string;
+  /** Apartment or complex name (when property type is Multi-family). */
+  complexName: string;
+  /** The submitter's role at the property. */
+  role: PropertyContactRole;
+}
+
+/** The person who'll be at the property, when different from the requester. */
+export interface OnSiteContact {
+  differs: boolean;
+  name: string;
+  phone: string;
+}
 
 export interface CustomerInfo {
   firstName: string;
@@ -30,11 +56,15 @@ export interface AddressInfo {
   zip: string;
 }
 
-export type LadderAccess = 'no' | 'yes' | 'unsure';
+export type BlockedAccess = 'no' | 'yes' | 'unsure';
 
-export interface LadderInfo {
-  access: LadderAccess;
-  story: string;
+export interface WindowAccessInfo {
+  /** What floor(s) the window/work area is on. */
+  floors: string;
+  /** Whether anything is blocking access to it/them. */
+  blocked: BlockedAccess;
+  /** Description of the obstruction (when blocked === 'yes'). */
+  blockedNotes: string;
 }
 
 export interface SpecialInstructions {
@@ -74,7 +104,7 @@ export interface IssueDetails {
   isSecure: boolean;
   hasBrokenGlass: boolean;
   hasWaterOrWeatherEntry: boolean;
-  ladder: LadderInfo;
+  windowAccess: WindowAccessInfo;
   photos: UploadedPhoto[];
   categoryDetails: CategoryDetails;
 }
@@ -101,6 +131,8 @@ export interface IntakePayload {
   customer: CustomerInfo;
   address: AddressInfo;
   propertyType: PropertyType;
+  propertyDetails: PropertyDetails;
+  onSiteContact: OnSiteContact;
   answers: Record<string, string>;
   issueDetails: IssueDetails;
   specialInstructions: SpecialInstructions;

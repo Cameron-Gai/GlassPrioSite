@@ -49,8 +49,11 @@ export async function createAuthorization(
     amount: amountCents,
     currency,
     capture_method: 'manual',
-    automatic_payment_methods: { enabled: true },
-    description: 'Glass Doctor on-site charge',
+    // Card/wallet only, no redirect-based methods — so the inline Payment
+    // Element confirm needs no return_url and reliably resolves with the
+    // PaymentIntent (instead of erroring out and leaving an uncaptured hold).
+    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    description: 'Glass Doctor on-site consultation charge',
     metadata,
   });
   if (!intent.client_secret) throw new Error('Stripe did not return a client secret');

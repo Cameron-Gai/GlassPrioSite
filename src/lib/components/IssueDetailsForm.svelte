@@ -1,6 +1,6 @@
 <script lang="ts">
   import { intakeStore } from '$lib/stores/intakeStore';
-  import type { CategoryDetails, IssueDetails, LadderInfo } from '$lib/types/intake';
+  import type { CategoryDetails, IssueDetails, WindowAccessInfo } from '$lib/types/intake';
   import type { JobType } from '$lib/data/jobTypes';
 
   export let value: IssueDetails;
@@ -12,8 +12,8 @@
     intakeStore.updateIssueDetails({ [field]: raw } as Partial<IssueDetails>);
   }
 
-  function updateLadder<K extends keyof LadderInfo>(field: K, raw: LadderInfo[K]) {
-    intakeStore.updateLadder({ [field]: raw } as Partial<LadderInfo>);
+  function updateWindowAccess<K extends keyof WindowAccessInfo>(field: K, raw: WindowAccessInfo[K]) {
+    intakeStore.updateWindowAccess({ [field]: raw } as Partial<WindowAccessInfo>);
   }
 
   function updateCategory<K extends keyof CategoryDetails>(field: K, raw: CategoryDetails[K]) {
@@ -21,7 +21,7 @@
   }
 
   const doorOperationalOptions: Array<'yes' | 'no' | 'unsure'> = ['yes', 'no', 'unsure'];
-  const ladderOptions: Array<{ value: 'no' | 'yes' | 'unsure'; label: string }> = [
+  const blockedOptions: Array<{ value: 'no' | 'yes' | 'unsure'; label: string }> = [
     { value: 'no', label: 'No' },
     { value: 'yes', label: 'Yes' },
     { value: 'unsure', label: 'Unsure' }
@@ -202,36 +202,47 @@
   </div>
 
   <fieldset class="block">
-    <legend>Ladder access</legend>
-    <p class="legend-help">Will a ladder be needed to reach the work area?</p>
-    <div class="segmented" role="radiogroup" aria-label="Ladder needed">
-      {#each ladderOptions as opt (opt.value)}
-        <button
-          type="button"
-          role="radio"
-          aria-checked={value.ladder.access === opt.value}
-          class:active={value.ladder.access === opt.value}
-          on:click={() => updateLadder('access', opt.value)}
-        >
-          {opt.label}
-        </button>
-      {/each}
+    <legend>Window location &amp; access</legend>
+    <div>
+      <label for="floors">What floor(s) is the window on?</label>
+      <input
+        id="floors"
+        type="text"
+        placeholder="e.g. ground floor, 2nd story, floors 3–4"
+        value={value.windowAccess.floors}
+        on:input={(event) => updateWindowAccess('floors', event.currentTarget.value)}
+      />
     </div>
-    {#if value.ladder.access === 'yes'}
+    <div>
+      <span class="pseudo-label">Is there anything blocking access to it/them?</span>
+      <div class="segmented" role="radiogroup" aria-label="Anything blocking access">
+        {#each blockedOptions as opt (opt.value)}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={value.windowAccess.blocked === opt.value}
+            class:active={value.windowAccess.blocked === opt.value}
+            on:click={() => updateWindowAccess('blocked', opt.value)}
+          >
+            {opt.label}
+          </button>
+        {/each}
+      </div>
+    </div>
+    {#if value.windowAccess.blocked === 'yes'}
       <div>
-        <label for="story">What story or height?</label>
+        <label for="blockedNotes">What's blocking access?</label>
         <input
-          id="story"
+          id="blockedNotes"
           type="text"
-          placeholder="e.g. 2nd story, ~15 ft"
-          value={value.ladder.story}
-          on:input={(event) => updateLadder('story', event.currentTarget.value)}
+          placeholder="e.g. landscaping, furniture, locked gate, parked vehicles"
+          value={value.windowAccess.blockedNotes}
+          on:input={(event) => updateWindowAccess('blockedNotes', event.currentTarget.value)}
         />
       </div>
-    {:else if value.ladder.access === 'unsure'}
+    {:else if value.windowAccess.blocked === 'unsure'}
       <p class="legend-help">
-        No problem — a photo of the area from outside helps us judge the reach. You can add one on
-        the next step.
+        No problem — a photo of the area helps our team plan access. You can add one on the next step.
       </p>
     {/if}
   </fieldset>

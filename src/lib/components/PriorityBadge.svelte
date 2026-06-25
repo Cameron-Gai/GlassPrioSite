@@ -3,11 +3,13 @@
 
   export let priority: JobPriority | '';
 
+  // Brand palette: Urgent = Supporting Red, High = Light Blue, Normal = Primary
+  // Blue, Low = neutral. No off-brand hues.
   const palette: Record<JobPriority, { bg: string; fg: string }> = {
-    Urgent: { bg: '#fdecea', fg: '#c0392b' },
-    High: { bg: '#fff4dc', fg: '#a36100' },
-    Normal: { bg: '#e3f0fb', fg: '#0b4f8a' },
-    Low: { bg: '#eef0f4', fg: '#5a6578' }
+    Urgent: { bg: '#ffe6e8', fg: '#c2001f' },
+    High: { bg: '#e7f3fc', fg: '#1f5e8f' },
+    Normal: { bg: '#e7e7f5', fg: '#06038d' },
+    Low: { bg: '#eef0f4', fg: '#56657d' }
   };
 
   $: style = priority ? palette[priority as JobPriority] : palette.Normal;
