@@ -261,7 +261,7 @@ export const triageTree: Record<string, TriageNode> = {
       {
         id: 'patio-pet-glass-only',
         label: 'Just the glass needs replacing',
-        nextNodeId: 'glass-panes'
+        routeJobTypeName: 'Glass Replacement (1-4 Panes) - Consultation'
       },
       {
         id: 'patio-pet-door',

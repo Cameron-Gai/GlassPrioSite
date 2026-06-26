@@ -46,12 +46,11 @@ function validate(payload: IntakePayload): string | null {
     return 'address fields are required';
   }
 
-  if (
-    !issueDetails ||
-    !isNonEmptyString(issueDetails.description) ||
-    !isNonEmptyString(issueDetails.happenedAt)
-  ) {
-    return 'issueDetails fields are required';
+  // issueDetails must be present (photo storage + the ServiceTitan mapper read
+  // its nested fields), but the individual fields are optional by design — the
+  // intake form and the mapper both treat description/happenedAt as optional.
+  if (!issueDetails || typeof issueDetails !== 'object') {
+    return 'issueDetails is required';
   }
 
   return null;
