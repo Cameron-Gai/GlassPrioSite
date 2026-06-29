@@ -5,8 +5,15 @@
  * ServiceTitan booking is created) so a customer is never charged without a
  * booking — if booking fails we cancel the authorization and the hold is released.
  *
- * Disabled (returns null / not configured) when STRIPE_SECRET_KEY is unset, so
+ * Disabled (returns null / not configured) when no secret key resolves, so
  * dev/unconfigured environments keep working with no payment step.
+ *
+ * TEST/LIVE TOGGLE: set `STRIPE_MODE=test` or `STRIPE_MODE=live` and store both
+ * key sets once — `STRIPE_{SECRET,PUBLISHABLE}_KEY_TEST` and `…_LIVE`. Flip
+ * STRIPE_MODE to switch; no need to swap key values. With STRIPE_MODE unset it
+ * falls back to the generic `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY`
+ * (legacy behavior). A key whose own mode contradicts STRIPE_MODE is refused, so
+ * a live key is never used while in test mode (or vice-versa).
  */
 import Stripe from 'stripe';
 import { env } from '$env/dynamic/private';
@@ -21,15 +28,58 @@ const SECRET_KEY_RE = /^(sk|rk)_(test|live)_[A-Za-z0-9]+$/;
 /** Publishable keys handed to the browser are pk_test_/pk_live_. */
 const PUBLISHABLE_KEY_RE = /^pk_(test|live)_[A-Za-z0-9]+$/;
 
+export type StripeMode = 'test' | 'live';
+
+/** The explicit toggle, or null when unset (= legacy generic-key behavior). */
+export function getStripeMode(): StripeMode | null {
+  const m = env.STRIPE_MODE?.trim().toLowerCase();
+  if (m === 'test') return 'test';
+  if (m === 'live') return 'live';
+  return null;
+}
+
+/** A Stripe key's own mode, read from its `_test_` / `_live_` segment. */
+function keyMode(key: string): StripeMode | null {
+  if (key.includes('_test_')) return 'test';
+  if (key.includes('_live_')) return 'live';
+  return null;
+}
+
+/**
+ * Resolve a Stripe key honoring the STRIPE_MODE toggle. When a mode is set, prefer
+ * the scoped var (`<base>_TEST` / `<base>_LIVE`), else the generic `<base>` — but
+ * refuse any key whose own mode contradicts STRIPE_MODE (prevents charging real
+ * cards while you think you're in test). When no mode is set, use `<base>` as-is.
+ */
+function resolveStripeKey(base: 'STRIPE_SECRET_KEY' | 'STRIPE_PUBLISHABLE_KEY'): string | undefined {
+  const generic = env[base]?.trim() || undefined;
+  const mode = getStripeMode();
+  if (!mode) return generic; // legacy: no toggle configured
+
+  const scopedName = `${base}_${mode.toUpperCase()}`;
+  const candidate = (env[scopedName]?.trim() || undefined) ?? generic;
+  if (!candidate) {
+    console.error(`[stripe] STRIPE_MODE=${mode} but neither ${scopedName} nor ${base} is set.`);
+    return undefined;
+  }
+  if (keyMode(candidate) !== mode) {
+    console.error(
+      `[stripe] STRIPE_MODE=${mode} but the resolved ${base} is a ${keyMode(candidate) ?? 'unknown'}-mode key — refusing it so the wrong key can't be used. Set ${scopedName}.`
+    );
+    return undefined;
+  }
+  return candidate;
+}
+
 function getStripe(): Stripe | null {
   if (cached === undefined) {
-    const key = env.STRIPE_SECRET_KEY?.trim();
+    const key = resolveStripeKey('STRIPE_SECRET_KEY');
     if (key && !SECRET_KEY_RE.test(key)) {
       // A malformed key (e.g. a placeholder, or a publishable key pasted into the
       // secret slot) would otherwise be treated as "configured" and then blow up
       // at the first API call. Treat it as not-configured and say why, loudly.
       console.error(
-        `[stripe] STRIPE_SECRET_KEY is set but malformed (got "${key.slice(0, 4)}…", expected sk_/rk_ + test/live). Treating Stripe as NOT configured.`
+        `[stripe] resolved secret key is malformed (got "${key.slice(0, 4)}…", expected sk_/rk_ + test/live). Treating Stripe as NOT configured.`
       );
     }
     cached = key && SECRET_KEY_RE.test(key) ? new Stripe(key) : null;
@@ -43,12 +93,12 @@ export function isStripeConfigured(): boolean {
 
 /** Publishable key handed to the browser to mount the Payment Element. Returns
  *  null when unset OR malformed, so a bad key degrades instead of failing in the
- *  browser with no server-side trace. */
+ *  browser with no server-side trace. Honors the STRIPE_MODE toggle. */
 export function getPublishableKey(): string | null {
-  const key = env.STRIPE_PUBLISHABLE_KEY?.trim();
+  const key = resolveStripeKey('STRIPE_PUBLISHABLE_KEY');
   if (!key) return null;
   if (!PUBLISHABLE_KEY_RE.test(key)) {
-    console.error(`[stripe] STRIPE_PUBLISHABLE_KEY is malformed (got "${key.slice(0, 4)}…", expected pk_test_/pk_live_ + key body).`);
+    console.error(`[stripe] resolved publishable key is malformed (got "${key.slice(0, 4)}…", expected pk_test_/pk_live_ + key body).`);
     return null;
   }
   return key;

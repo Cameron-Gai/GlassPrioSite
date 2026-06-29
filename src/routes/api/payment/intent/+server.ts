@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { resolveFee } from '$lib/server/zoneFee';
-import { createAuthorization, getPublishableKey, isStripeConfigured, classifyStripeError } from '$lib/server/payments/stripe';
+import { createAuthorization, getPublishableKey, isStripeConfigured, classifyStripeError, getStripeMode } from '$lib/server/payments/stripe';
 
 /** Operators flip PAYMENT_DEBUG=true (Railway var) to surface the precise failure
  *  reason in the API response + intake UI while diagnosing; off for customers. */
@@ -51,7 +51,7 @@ export const POST: RequestHandler = async ({ request }) => {
       flag,
       debug,
       ...(code ? { code } : {}),
-      ...(debug && reason ? { reason } : {}),
+      ...(debug ? { stripeMode: getStripeMode() ?? 'legacy', reason } : {}),
     });
 
   if (!(fee.serviced && fee.osc > 0)) {
@@ -87,6 +87,7 @@ export const POST: RequestHandler = async ({ request }) => {
       paymentIntentId: auth.id,
       publishableKey,
       debug,
+      ...(debug ? { stripeMode: getStripeMode() ?? 'legacy' } : {}),
     });
   } catch (err) {
     // Stripe rejected the authorization (bad key, missing permission, outage…).
