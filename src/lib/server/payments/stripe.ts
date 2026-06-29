@@ -13,10 +13,13 @@ import { env } from '$env/dynamic/private';
 
 let cached: Stripe | null | undefined;
 
+// Validate by PREFIX + a non-empty key body only — NOT by length. Stripe key
+// length varies by account vintage (older accounts issue ~24-char bodies, newer
+// ones ~99); a length heuristic falsely rejects valid older keys.
 /** A usable Stripe secret key is a standard (sk_) or restricted (rk_) key, test or live. */
-const SECRET_KEY_RE = /^(sk|rk)_(test|live)_/;
+const SECRET_KEY_RE = /^(sk|rk)_(test|live)_[A-Za-z0-9]+$/;
 /** Publishable keys handed to the browser are pk_test_/pk_live_. */
-const PUBLISHABLE_KEY_RE = /^pk_(test|live)_/;
+const PUBLISHABLE_KEY_RE = /^pk_(test|live)_[A-Za-z0-9]+$/;
 
 function getStripe(): Stripe | null {
   if (cached === undefined) {
@@ -45,13 +48,7 @@ export function getPublishableKey(): string | null {
   const key = env.STRIPE_PUBLISHABLE_KEY?.trim();
   if (!key) return null;
   if (!PUBLISHABLE_KEY_RE.test(key)) {
-    console.error(`[stripe] STRIPE_PUBLISHABLE_KEY is malformed (got "${key.slice(0, 4)}…", expected pk_test_/pk_live_).`);
-    return null;
-  }
-  if (key.length < 40) {
-    // Real publishable keys are ~107 chars; a very short one is almost certainly
-    // a truncated paste and will fail to mount the Payment Element.
-    console.error(`[stripe] STRIPE_PUBLISHABLE_KEY looks truncated (length ${key.length}; expected ~107). Re-copy the full key.`);
+    console.error(`[stripe] STRIPE_PUBLISHABLE_KEY is malformed (got "${key.slice(0, 4)}…", expected pk_test_/pk_live_ + key body).`);
     return null;
   }
   return key;
