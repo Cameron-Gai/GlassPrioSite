@@ -11,7 +11,7 @@ import {
 import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
 import { resolveFee } from '$lib/server/zoneFee';
 import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
-import { captureIntent, cancelIntent, getIntent, isStripeConfigured } from '$lib/server/payments/stripe';
+import { captureIntent, cancelIntent, getIntent } from '$lib/server/payments/stripe';
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
@@ -92,20 +92,16 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const interior = payload.selectedJobType.category === 'shower-mirror';
   const fee = await resolveFee(payload.address.zip, payload.selectedJobType.name);
   const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior);
-  const mustCollect = fee.serviced && fee.osc > 0 && isStripeConfigured();
+  const feeDue = fee.serviced && fee.osc > 0;
 
-  // Verify the Stripe authorization BEFORE booking. The amount is taken from the
-  // zone map here (server-authoritative) — never from the client.
+  // Online collection is BEST-EFFORT and must never block a lead. If the customer
+  // authorized a card hold at review, verify it (amount taken from the zone map —
+  // server-authoritative, never the client) and capture it on booking. If they
+  // didn't — online payment was unavailable/degraded at review — book anyway and
+  // let the office collect the OSC at scheduling.
   let authorizedIntentId: string | null = null;
-  if (mustCollect) {
-    const intentId = (payload.paymentIntentId ?? '').trim();
-    if (!intentId) {
-      console.warn('[api/intake] fee due but no paymentIntentId in payload', { osc: fee.osc, zip: payload.address.zip });
-      return json(
-        { success: false, error: 'Payment is required for this service. Please complete payment and try again.' },
-        { status: 402 }
-      );
-    }
+  const intentId = (payload.paymentIntentId ?? '').trim();
+  if (feeDue && intentId) {
     let intent;
     try {
       intent = await getIntent(intentId);
@@ -127,6 +123,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
       );
     }
     authorizedIntentId = intentId;
+  } else if (feeDue) {
+    // OSC due but nothing was authorized online — book unpaid; the office collects
+    // at scheduling. (Mirrors the "we'll collect when scheduling" message the
+    // customer sees when Stripe is unavailable/degraded.)
+    console.warn('[api/intake] OSC due but no paymentIntentId — booking unpaid; office collects at scheduling', {
+      osc: fee.osc,
+      zip: payload.address.zip
+    });
   }
 
   const feeCtx: BookingFeeContext = {
