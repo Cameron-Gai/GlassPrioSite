@@ -13,10 +13,23 @@ import { env } from '$env/dynamic/private';
 
 let cached: Stripe | null | undefined;
 
+/** A usable Stripe secret key is a standard (sk_) or restricted (rk_) key, test or live. */
+const SECRET_KEY_RE = /^(sk|rk)_(test|live)_/;
+/** Publishable keys handed to the browser are pk_test_/pk_live_. */
+const PUBLISHABLE_KEY_RE = /^pk_(test|live)_/;
+
 function getStripe(): Stripe | null {
   if (cached === undefined) {
     const key = env.STRIPE_SECRET_KEY?.trim();
-    cached = key ? new Stripe(key) : null;
+    if (key && !SECRET_KEY_RE.test(key)) {
+      // A malformed key (e.g. a placeholder, or a publishable key pasted into the
+      // secret slot) would otherwise be treated as "configured" and then blow up
+      // at the first API call. Treat it as not-configured and say why, loudly.
+      console.error(
+        `[stripe] STRIPE_SECRET_KEY is set but malformed (got "${key.slice(0, 4)}…", expected sk_/rk_ + test/live). Treating Stripe as NOT configured.`
+      );
+    }
+    cached = key && SECRET_KEY_RE.test(key) ? new Stripe(key) : null;
   }
   return cached;
 }
@@ -25,9 +38,50 @@ export function isStripeConfigured(): boolean {
   return getStripe() !== null;
 }
 
-/** Publishable key handed to the browser to mount the Payment Element. */
+/** Publishable key handed to the browser to mount the Payment Element. Returns
+ *  null when unset OR malformed, so a bad key degrades instead of failing in the
+ *  browser with no server-side trace. */
 export function getPublishableKey(): string | null {
-  return env.STRIPE_PUBLISHABLE_KEY?.trim() || null;
+  const key = env.STRIPE_PUBLISHABLE_KEY?.trim();
+  if (!key) return null;
+  if (!PUBLISHABLE_KEY_RE.test(key)) {
+    console.error(`[stripe] STRIPE_PUBLISHABLE_KEY is malformed (got "${key.slice(0, 4)}…", expected pk_test_/pk_live_).`);
+    return null;
+  }
+  if (key.length < 40) {
+    // Real publishable keys are ~107 chars; a very short one is almost certainly
+    // a truncated paste and will fail to mount the Payment Element.
+    console.error(`[stripe] STRIPE_PUBLISHABLE_KEY looks truncated (length ${key.length}; expected ~107). Re-copy the full key.`);
+    return null;
+  }
+  return key;
+}
+
+export interface StripeFailure {
+  /** Stable, operator-facing code (e.g. 'stripe-permission'). */
+  code: string;
+  /** One-line, actionable explanation for an operator. Never shown to customers. */
+  reason: string;
+}
+
+/** Map a thrown Stripe error to a stable code + actionable operator hint. */
+export function classifyStripeError(err: unknown): StripeFailure {
+  const e = (err ?? {}) as { type?: string; message?: string };
+  const message = e.message || 'Unknown Stripe error';
+  switch (e.type) {
+    case 'StripeAuthenticationError':
+      return { code: 'stripe-auth', reason: 'Stripe rejected the API key (invalid, revoked, or wrong account). Check STRIPE_SECRET_KEY.' };
+    case 'StripePermissionError':
+      return { code: 'stripe-permission', reason: 'The Stripe key lacks PaymentIntents permission. Grant "PaymentIntents: Write" to the restricted (rk_) key, or use a standard sk_ secret key.' };
+    case 'StripeConnectionError':
+      return { code: 'stripe-connection', reason: 'Could not reach Stripe (network/outage). Transient — retry.' };
+    case 'StripeRateLimitError':
+      return { code: 'stripe-rate-limit', reason: 'Stripe rate-limited the request. Transient — retry shortly.' };
+    case 'StripeInvalidRequestError':
+      return { code: 'stripe-invalid-request', reason: `Stripe rejected the request: ${message}` };
+    default:
+      return { code: 'stripe-error', reason: message };
+  }
 }
 
 export interface AuthorizationResult {

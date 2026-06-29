@@ -14,6 +14,10 @@
   let zoneName: string | null = null;
   let infoText = '';
   let payError = '';
+  /** Operator-facing diagnostic. Only rendered when the server reports
+   *  debug mode (PAYMENT_DEBUG=true), so customers never see internals. */
+  let diagnostic = '';
+  let debugMode = false;
 
   let stripe: Stripe | null = null;
   let elements: StripeElements | null = null;
@@ -30,7 +34,7 @@
     if (flag === 'unserviced-or-unknown') {
       return 'We could not match your ZIP to a service area. You can still submit — our office will confirm coverage and any fee when scheduling.';
     }
-    if (flag === 'payment-not-configured' || amt > 0) {
+    if (flag === 'payment-not-configured' || flag === 'payment-unavailable' || amt > 0) {
       return `An on-site consultation charge of ${money(amt)} applies for your area. Our office will collect it when scheduling.`;
     }
     // We couldn't actually resolve the charge (fee service unreachable / not
@@ -60,6 +64,15 @@
       currency = data.currency || 'usd';
       zoneName = data.zoneName ?? null;
       const flag = data.flag ?? 'none';
+      debugMode = data.debug === true;
+
+      // Operator diagnostics: the server attaches a stable `code` for any
+      // collect-later outcome, plus a verbose `reason` only when PAYMENT_DEBUG is
+      // on. Always log it to the console; surface it in-UI only when sent.
+      if (data.code) {
+        console.warn(`[PaymentStep] online payment not collected [${data.code}]${data.reason ? ': ' + data.reason : ''}`);
+      }
+      diagnostic = data.reason ? `Payment setup (${data.code}): ${data.reason}` : '';
 
       intakeStore.setFeeQuote({
         serviced: data.serviced === true || data.paymentRequired === true,
@@ -86,10 +99,18 @@
       paymentElement.mount(cardNode);
     } catch (err) {
       // Degrade soft — a payment-setup problem must never block a real lead.
-      console.error('[PaymentStep] setup failed', err);
-      intakeStore.setFeeQuote({ serviced: false, osc: amount, currency, zoneName, flag: 'fee-setup-failed', paymentRequired: false });
+      // (Server-side Stripe failures already degrade to a 200 collect-later
+      // response; this catch handles client-side Stripe.js / network failures.)
+      console.error('[PaymentStep] online payment setup failed', err);
+      intakeStore.setFeeQuote({ serviced: amount > 0, osc: amount, currency, zoneName, flag: 'payment-unavailable', paymentRequired: false });
+      // If we already know the charge, show it (better than a vague apology);
+      // otherwise fall back to the generic confirm-at-scheduling line.
       infoText =
-        'We could not set up online payment right now. You can still submit — our office will confirm any on-site consultation charge when scheduling.';
+        amount > 0
+          ? `An on-site consultation charge of ${money(amount)} applies for your area. Our office will collect it when scheduling.`
+          : 'We could not confirm the on-site consultation charge right now. You can still submit — our office will confirm any charge when scheduling.';
+      diagnostic = `Payment setup failed in the browser: ${err instanceof Error ? err.message : String(err)}`;
+      console.warn(`[PaymentStep] ${diagnostic}`);
       phase = 'info';
     }
   }
@@ -135,6 +156,9 @@
     <p class="muted">Checking the charge for your area…</p>
   {:else if phase === 'info'}
     <p class="muted">{infoText}</p>
+    {#if debugMode && diagnostic}
+      <p class="diagnostic" role="note">⚠️ {diagnostic}</p>
+    {/if}
   {:else}
     <p class="amount-line">
       Due now: <strong>{money(amount)}</strong>
@@ -199,6 +223,21 @@
     color: var(--color-emergency);
     margin: 0;
     font-size: 0.9rem;
+  }
+
+  /* Operator-only (PAYMENT_DEBUG): a precise, monospaced reason for why online
+     collection didn't happen. Gated server-side so customers never see it. */
+  .diagnostic {
+    margin: 0.4rem 0 0;
+    padding: 0.5rem 0.65rem;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: var(--radius-md);
+    color: #9a3412;
+    font-size: 0.8rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    line-height: 1.4;
+    word-break: break-word;
   }
 
   .pay-btn {

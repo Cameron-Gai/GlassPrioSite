@@ -1,7 +1,15 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { env } from '$env/dynamic/private';
 import { resolveFee } from '$lib/server/zoneFee';
-import { createAuthorization, getPublishableKey, isStripeConfigured } from '$lib/server/payments/stripe';
+import { createAuthorization, getPublishableKey, isStripeConfigured, classifyStripeError } from '$lib/server/payments/stripe';
+
+/** Operators flip PAYMENT_DEBUG=true (Railway var) to surface the precise failure
+ *  reason in the API response + intake UI while diagnosing; off for customers. */
+function paymentDebugEnabled(): boolean {
+  const v = env.PAYMENT_DEBUG?.trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes';
+}
 
 /**
  * POST /api/payment/intent { zip, jobTypeName }
@@ -27,19 +35,39 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const fee = await resolveFee(zip, jobTypeName);
+  const debug = paymentDebugEnabled();
+
+  // A charge-due response that, for whatever reason, can't be collected online.
+  // We never block the lead: the customer still sees the amount and submits, and
+  // the office collects at scheduling. `code`/`reason` ride along for operators
+  // (reason only when PAYMENT_DEBUG is on, so customers never see internals).
+  const collectLater = (flag: string, code?: string, reason?: string) =>
+    json({
+      paymentRequired: false,
+      amount: fee.osc,
+      currency: fee.currency,
+      serviced: true,
+      zoneName: fee.zoneName,
+      flag,
+      debug,
+      ...(code ? { code } : {}),
+      ...(debug && reason ? { reason } : {}),
+    });
 
   if (!(fee.serviced && fee.osc > 0)) {
     return json({ paymentRequired: false, amount: fee.osc, currency: fee.currency, serviced: fee.serviced, flag: fee.flag });
   }
   if (!isStripeConfigured()) {
-    // Fee is due but online collection isn't configured — the booking still
-    // proceeds and the office collects at conversion.
-    return json({ paymentRequired: false, amount: fee.osc, currency: fee.currency, serviced: true, flag: 'payment-not-configured' });
+    // No (or malformed) Stripe secret key — online collection is off by design.
+    return collectLater('payment-not-configured', 'stripe-not-configured', 'STRIPE_SECRET_KEY is unset or malformed on the server.');
   }
 
   const publishableKey = getPublishableKey();
   if (!publishableKey) {
-    return json({ error: 'Stripe publishable key is not configured' }, { status: 500 });
+    // Secret key works but the browser-side key is missing/malformed/truncated —
+    // we can't mount the Payment Element, so collect later rather than dead-end.
+    console.error('[api/payment/intent] STRIPE_PUBLISHABLE_KEY missing or malformed — collecting on-site charge at scheduling instead.');
+    return collectLater('payment-unavailable', 'stripe-publishable-invalid', 'STRIPE_PUBLISHABLE_KEY is unset, malformed, or truncated (expected a full pk_live_/pk_test_ key).');
   }
 
   try {
@@ -58,9 +86,14 @@ export const POST: RequestHandler = async ({ request }) => {
       clientSecret: auth.clientSecret,
       paymentIntentId: auth.id,
       publishableKey,
+      debug,
     });
   } catch (err) {
-    console.error('[api/payment/intent] failed to create authorization', err);
-    return json({ error: 'Could not start payment. Please try again.' }, { status: 502 });
+    // Stripe rejected the authorization (bad key, missing permission, outage…).
+    // Degrade to collect-later with a precise, logged diagnostic instead of a
+    // 502 that leaves the customer staring at "couldn't set up online payment".
+    const failure = classifyStripeError(err);
+    console.error(`[api/payment/intent] Stripe authorization failed [${failure.code}]: ${failure.reason}`, err);
+    return collectLater('payment-unavailable', failure.code, failure.reason);
   }
 };
