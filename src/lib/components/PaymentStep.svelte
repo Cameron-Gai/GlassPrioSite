@@ -33,6 +33,13 @@
     if (flag === 'payment-not-configured' || amt > 0) {
       return `An on-site consultation charge of ${money(amt)} applies for your area. Our office will collect it when scheduling.`;
     }
+    // We couldn't actually resolve the charge (fee service unreachable / not
+    // configured / setup failed) — don't tell the customer there's no fee, since
+    // there may be one. Only fall through to the affirmative "no charge" line
+    // when the fee service authoritatively returned a serviced $0 (flag 'none').
+    if (flag === 'fee-service-unreachable' || flag === 'not-configured' || flag === 'fee-setup-failed') {
+      return 'We could not confirm the on-site consultation charge for your area right now. You can still submit — our office will confirm any charge when scheduling.';
+    }
     return 'No on-site consultation charge applies for this service.';
   }
 
