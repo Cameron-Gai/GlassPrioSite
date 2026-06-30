@@ -15,6 +15,7 @@
   import IssueDetailsForm from './IssueDetailsForm.svelte';
   import SiteAccessForm from './SiteAccessForm.svelte';
   import CustomerInfoForm from './CustomerInfoForm.svelte';
+  import ReturningCustomerCheck from './ReturningCustomerCheck.svelte';
   import AddressForm from './AddressForm.svelte';
   import SchedulingPreferenceForm from './SchedulingPreferenceForm.svelte';
   import ReviewSubmission from './ReviewSubmission.svelte';
@@ -27,6 +28,7 @@
     issue: "What's going on",
     site: 'Property & access',
     contact: 'Your contact info',
+    'returning-check': 'Is this you?',
     address: 'Service address',
     scheduling: 'When works best',
     review: 'Review & submit',
@@ -114,6 +116,7 @@
     state.selectedJobType &&
     state.step !== 'triage' &&
     state.step !== 'priority-upgrade' &&
+    state.step !== 'returning-check' &&
     state.step !== 'review' &&
     state.step !== 'confirmation';
 </script>
@@ -190,6 +193,8 @@
         <h2>How can we reach you?</h2>
       </header>
       <CustomerInfoForm value={state.customer} showErrors={attempted} />
+    {:else if state.step === 'returning-check'}
+      <ReturningCustomerCheck {state} />
     {:else if state.step === 'address'}
       <header class="screen-head">
         <h2>Where is the service needed?</h2>
@@ -225,7 +230,7 @@
          wizard only shows its own Submit for free/no-charge requests. -->
     {@const showWizardSubmit = atReview && feeResolved && !feeDue}
     {@const showFeeLoading = atReview && !feeResolved}
-    {@const showContinue = !['triage', 'priority-upgrade', 'review'].includes(state.step)}
+    {@const showContinue = !['triage', 'priority-upgrade', 'returning-check', 'review'].includes(state.step)}
     {@const showActions = canGoBack || showWizardSubmit || showContinue || showFeeLoading}
     {#if showActions}
       <div class="actions" class:back-only={canGoBack && !showWizardSubmit && !showContinue && !showFeeLoading}>

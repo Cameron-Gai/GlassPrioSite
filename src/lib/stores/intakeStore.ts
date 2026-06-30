@@ -34,6 +34,7 @@ export type WizardStep =
   | 'issue'
   | 'site'
   | 'contact'
+  | 'returning-check'
   | 'address'
   | 'scheduling'
   | 'review'
@@ -82,7 +83,8 @@ export interface IntakeState {
   submitError: string | null;
   /** Returning-customer autofill state (greet + confirm flow). */
   returning: {
-    status: 'idle' | 'checking' | 'found' | 'applied' | 'none';
+    // idle → checking → found (awaiting decision) → applied | declined; or none (no match).
+    status: 'idle' | 'checking' | 'found' | 'applied' | 'declined' | 'none';
     firstName: string | null;
   };
 }
@@ -97,6 +99,7 @@ export interface IntakeState {
 export const STEP_ORDER: WizardStep[] = [
   'triage',
   'contact',
+  'returning-check',
   'property-type',
   'priority-upgrade',
   'issue',
@@ -115,7 +118,7 @@ export interface PhaseDef {
 
 export const PHASES: PhaseDef[] = [
   { id: 'tell-us', label: 'Tell us', steps: ['triage'] },
-  { id: 'you', label: 'About you', steps: ['contact', 'property-type'] },
+  { id: 'you', label: 'About you', steps: ['contact', 'returning-check', 'property-type'] },
   { id: 'details', label: 'Details', steps: ['priority-upgrade', 'issue', 'site', 'address'] },
   { id: 'finish', label: 'Finish', steps: ['scheduling', 'review'] }
 ];
@@ -207,6 +210,13 @@ function postRouteStep(_state: IntakeState): WizardStep {
 function shouldSkipStep(step: WizardStep, state: IntakeState): boolean {
   if (step === 'priority-upgrade') return !canUpgradeToPriority(state.selectedJobType);
   if (step === 'property-type') return state.returning.status === 'applied';
+  // The "Is this you?" check renders only while the lookup is pending or a match
+  // awaits the customer's decision. Once resolved+handled (applied / declined /
+  // no-match) it's skipped — so it never re-appears, incl. on Back navigation.
+  if (step === 'returning-check') {
+    const s = state.returning.status;
+    return s === 'applied' || s === 'declined' || s === 'none';
+  }
   return false;
 }
 
@@ -424,7 +434,7 @@ function createIntakeStore() {
   }
 
   function dismissReturningCustomer() {
-    store.update((s) => ({ ...s, returning: { status: 'none', firstName: null } }));
+    store.update((s) => ({ ...s, returning: { status: 'declined', firstName: s.returning.firstName } }));
   }
 
   function updateAddress(patch: Partial<AddressInfo>) {
