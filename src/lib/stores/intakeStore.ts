@@ -10,6 +10,7 @@ import {
   type TriageOption
 } from '$lib/triage/triageTree';
 import { getPublicJobType, type JobType } from '$lib/data/jobTypes';
+import type { IntakePreset } from '$lib/data/testPresets';
 import type {
   AddressInfo,
   CategoryDetails,
@@ -598,6 +599,39 @@ function createIntakeStore() {
     store.set(initialState());
   }
 
+  /**
+   * TEST MODE ONLY: load a prefilled preset and jump to review so an operator can
+   * submit a real ServiceTitan booking in one click. Starts from a clean state
+   * (no stale answers / payment), resolves the job type, and derives emergency
+   * routing from the job category. Gated in the UI by /api/config testMode.
+   */
+  function loadPreset(preset: IntakePreset) {
+    const job = getPublicJobType(preset.jobTypeName);
+    const emergency = job.category === 'emergency';
+    const base = initialState();
+    store.set({
+      ...base,
+      selectedJobType: job,
+      originalJobType: job,
+      isEmergency: emergency,
+      isDuringBusinessHours: emergency ? isBusinessHours() : false,
+      customer: { ...base.customer, ...preset.customer },
+      address: { ...base.address, ...preset.address },
+      propertyType: preset.propertyType,
+      propertyDetails: { ...base.propertyDetails, ...(preset.propertyDetails ?? {}) },
+      issueDetails: {
+        ...base.issueDetails,
+        ...(preset.issue ?? {}),
+        windowAccess: { ...base.issueDetails.windowAccess, ...(preset.issue?.windowAccess ?? {}) },
+        categoryDetails: { ...base.issueDetails.categoryDetails, ...(preset.issue?.categoryDetails ?? {}) },
+        photos: base.issueDetails.photos
+      },
+      specialInstructions: { ...base.specialInstructions, ...(preset.special ?? {}) },
+      schedulingPreference: preset.schedulingPreference,
+      step: 'review'
+    });
+  }
+
   return {
     subscribe: store.subscribe,
     selectOption,
@@ -625,6 +659,7 @@ function createIntakeStore() {
     setSchedulingPreference,
     submit,
     reset,
+    loadPreset,
     buildPayload
   };
 }

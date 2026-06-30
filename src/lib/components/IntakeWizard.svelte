@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import {
     intakeStore,
     currentTriageNode,
     currentPhaseIndex,
     type WizardStep
   } from '$lib/stores/intakeStore';
+  import { testPresets } from '$lib/data/testPresets';
   import QuestionCard from './QuestionCard.svelte';
   import PhaseStepper from './PhaseStepper.svelte';
   import JobTypeBanner from './JobTypeBanner.svelte';
@@ -89,6 +91,18 @@
     attempted = false;
   }
 
+  // Test-mode only: the server tells us whether to surface the preset panel
+  // (true unless STRIPE_MODE=live). Customers in live mode never see it.
+  let testMode = false;
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/config');
+      if (res.ok) testMode = (await res.json()).testMode === true;
+    } catch {
+      // Config fetch is best-effort; default to hidden.
+    }
+  });
+
   $: state = $intakeStore;
   $: node = $currentTriageNode;
   $: phaseIdx = $currentPhaseIndex;
@@ -105,6 +119,25 @@
 </script>
 
 <div class="wizard">
+  {#if testMode && state.step === 'triage'}
+    <div class="test-presets">
+      <p class="tp-title">🧪 Test mode — quick presets</p>
+      <p class="tp-sub">
+        Prefills a complete intake and jumps to review so you can submit a real booking to
+        ServiceTitan. Charged presets use Stripe test card <code>4242 4242 4242 4242</code> (any future
+        expiry / CVC). Hidden automatically when <code>STRIPE_MODE=live</code>.
+      </p>
+      <div class="tp-grid">
+        {#each testPresets as preset (preset.id)}
+          <button type="button" class="tp-btn" on:click={() => intakeStore.loadPreset(preset)}>
+            <span class="tp-label">{preset.label}</span>
+            <span class="tp-blurb">{preset.blurb}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   {#if state.step !== 'confirmation'}
     <div class="head">
       <PhaseStepper currentIndex={phaseIdx} />
@@ -218,6 +251,75 @@
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
+  }
+
+  /* Test-mode preset panel — dashed, high-contrast so it's obviously a dev tool
+     and never mistaken for customer UI. Only renders when /api/config reports
+     test mode (STRIPE_MODE !== 'live'). */
+  .test-presets {
+    border: 1.5px dashed #c026a3;
+    background: #fdf4ff;
+    border-radius: var(--radius-md);
+    padding: 0.85rem 0.95rem;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .tp-title {
+    margin: 0;
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #86198f;
+  }
+
+  .tp-sub {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: #6b2768;
+  }
+
+  .tp-sub code {
+    background: #f5d0fe;
+    border-radius: 4px;
+    padding: 0.05rem 0.3rem;
+    font-size: 0.92em;
+  }
+
+  .tp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+  }
+
+  .tp-btn {
+    display: grid;
+    gap: 0.2rem;
+    text-align: left;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid #e9a5e3;
+    border-radius: var(--radius-sm);
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .tp-btn:hover {
+    border-color: #c026a3;
+    background: #fdf4ff;
+  }
+
+  .tp-label {
+    font-weight: 600;
+    font-size: 0.86rem;
+    color: var(--color-text-strong, #1a1a2e);
+  }
+
+  .tp-blurb {
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: var(--color-muted);
   }
 
   .head {
