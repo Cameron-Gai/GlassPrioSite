@@ -91,16 +91,15 @@ export interface IntakeState {
 
 /**
  * All steps that can appear in the wizard, in their natural progression order.
- * Contact comes first (right after triage) so we capture the lead early and the
- * returning-customer lookup can run before we decide whether to ask property
- * type. Property type follows, and is skipped for recognized returning
- * customers (see shouldSkipStep).
+ * Property type is asked right after triage; then contact (name/phone/email);
+ * then the returning-customer "Is this you?" check, which needs the phone+email
+ * to run. The check (not property type) is what's skipped once it's resolved.
  */
 export const STEP_ORDER: WizardStep[] = [
   'triage',
+  'property-type',
   'contact',
   'returning-check',
-  'property-type',
   'priority-upgrade',
   'issue',
   'site',
@@ -118,7 +117,7 @@ export interface PhaseDef {
 
 export const PHASES: PhaseDef[] = [
   { id: 'tell-us', label: 'Tell us', steps: ['triage'] },
-  { id: 'you', label: 'About you', steps: ['contact', 'returning-check', 'property-type'] },
+  { id: 'you', label: 'About you', steps: ['property-type', 'contact', 'returning-check'] },
   { id: 'details', label: 'Details', steps: ['priority-upgrade', 'issue', 'site', 'address'] },
   { id: 'finish', label: 'Finish', steps: ['scheduling', 'review'] }
 ];
@@ -193,12 +192,10 @@ function applyEmergencyRoute(state: IntakeState): IntakeState {
 }
 
 function postRouteStep(_state: IntakeState): WizardStep {
-  // Contact comes first after the service is routed — capturing it early both
-  // recovers abandoned leads and lets the returning-customer lookup decide
-  // whether the property-type step is needed. The linear advance from there
-  // skips property-type (recognized returning customers) and priority-upgrade
-  // (when it doesn't apply).
-  return 'contact';
+  // Once the service is routed, ask property type first, then contact. The linear
+  // advance from there runs the returning-customer check and skips priority-upgrade
+  // when it doesn't apply.
+  return 'property-type';
 }
 
 /**
@@ -209,7 +206,6 @@ function postRouteStep(_state: IntakeState): WizardStep {
  */
 function shouldSkipStep(step: WizardStep, state: IntakeState): boolean {
   if (step === 'priority-upgrade') return !canUpgradeToPriority(state.selectedJobType);
-  if (step === 'property-type') return state.returning.status === 'applied';
   // The "Is this you?" check renders only while the lookup is pending or a match
   // awaits the customer's decision. Once resolved+handled (applied / declined /
   // no-match) it's skipped — so it never re-appears, incl. on Back navigation.
