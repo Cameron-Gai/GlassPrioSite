@@ -17,6 +17,9 @@ export interface BookingFeeContext {
   flag: string;
   /** Resolved ServiceTitan business-unit id for the ZIP + customer type (pre-fills the booking). */
   businessUnitId?: number | null;
+  /** Customer chose "Pay later": the OSC is collected by a texted Stripe link once
+   *  the booking is converted to a scheduled job (the GlassReports OSC pipeline). */
+  deferred?: boolean;
 }
 
 /**
@@ -136,9 +139,13 @@ function feeLine(feeCtx?: BookingFeeContext): string | null {
   if (!feeCtx) return null;
   const zone = feeCtx.zoneName ? ` (Zone ${feeCtx.zoneName})` : '';
   if (feeCtx.serviced && feeCtx.osc > 0) {
-    return feeCtx.paid
-      ? `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}).`
-      : `On-site consultation charge: $${feeCtx.osc}${zone} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
+    if (feeCtx.paid) {
+      return `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}).`;
+    }
+    if (feeCtx.deferred) {
+      return `On-site consultation charge: $${feeCtx.osc}${zone} - customer chose PAY LATER. On conversion to a job, the "OSC Collection" tag is applied and a Stripe payment link is texted to collect before the appointment.`;
+    }
+    return `On-site consultation charge: $${feeCtx.osc}${zone} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
   }
   if (!feeCtx.serviced) {
     return `On-site consultation charge: ZIP not found in the service-area map - office to confirm coverage and quote the fee.`;
@@ -158,6 +165,7 @@ function buildExternalData(feeCtx?: BookingFeeContext): Array<{ key: string; val
     data.push({ key: 'osc_paid', value: 'true' });
     data.push({ key: 'stripe_payment_intent', value: feeCtx.paymentIntentId });
   }
+  if (feeCtx.deferred) data.push({ key: 'osc_paylater', value: 'true' });
   return data;
 }
 

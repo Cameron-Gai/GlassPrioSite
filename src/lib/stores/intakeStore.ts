@@ -74,6 +74,9 @@ export interface IntakeState {
   /** Stripe PaymentIntent id once the card hold is authorized. */
   paymentIntentId: string | null;
   paymentAuthorized: boolean;
+  /** Customer chose "Pay later" at the charge step — book unpaid; OSC is collected
+   *  by a texted payment link once the job is scheduled (GlassReports pipeline). */
+  payLater: boolean;
   confirmationNumber: string | null;
   submitting: boolean;
   submitError: string | null;
@@ -162,6 +165,7 @@ function initialState(): IntakeState {
     feeQuote: null,
     paymentIntentId: null,
     paymentAuthorized: false,
+    payLater: false,
     confirmationNumber: null,
     submitting: false,
     submitError: null,
@@ -407,10 +411,11 @@ function createIntakeStore() {
           lastName: p.lastName || s.customer.lastName
         },
         address: p.address ? { ...s.address, ...p.address } : s.address,
-        // Address may have changed the ZIP — drop any stale fee/authorization.
+        // Address may have changed the ZIP — drop any stale fee/authorization/defer choice.
         feeQuote: p.address ? null : s.feeQuote,
         paymentIntentId: p.address ? null : s.paymentIntentId,
         paymentAuthorized: p.address ? false : s.paymentAuthorized,
+        payLater: p.address ? false : s.payLater,
         returning: { status: 'applied', firstName: p.firstName || s.returning.firstName }
       }));
     } catch {
@@ -423,13 +428,14 @@ function createIntakeStore() {
   }
 
   function updateAddress(patch: Partial<AddressInfo>) {
-    // A ZIP change can change the fee — drop any prior fee/authorization.
+    // A ZIP change can change the fee — drop any prior fee/authorization/defer choice.
     store.update((state) => ({
       ...state,
       address: { ...state.address, ...patch },
       feeQuote: null,
       paymentIntentId: null,
-      paymentAuthorized: false
+      paymentAuthorized: false,
+      payLater: false
     }));
   }
 
@@ -438,11 +444,16 @@ function createIntakeStore() {
   }
 
   function setPaymentAuthorized(paymentIntentId: string) {
-    store.update((state) => ({ ...state, paymentIntentId, paymentAuthorized: true }));
+    store.update((state) => ({ ...state, paymentIntentId, paymentAuthorized: true, payLater: false }));
+  }
+
+  /** Customer chose "Pay later by text" — submit unpaid; GlassReports collects via SMS link. */
+  function setPayLater(value: boolean) {
+    store.update((state) => ({ ...state, payLater: value }));
   }
 
   function resetPayment() {
-    store.update((state) => ({ ...state, feeQuote: null, paymentIntentId: null, paymentAuthorized: false }));
+    store.update((state) => ({ ...state, feeQuote: null, paymentIntentId: null, paymentAuthorized: false, payLater: false }));
   }
 
   function setPropertyType(value: PropertyType) {
@@ -556,6 +567,7 @@ function createIntakeStore() {
       specialInstructions: { ...state.specialInstructions },
       schedulingPreference: state.schedulingPreference,
       paymentIntentId: state.paymentAuthorized ? state.paymentIntentId : null,
+      payLater: state.payLater,
       createdAt: new Date().toISOString()
     };
   }
@@ -646,6 +658,7 @@ function createIntakeStore() {
     dismissReturningCustomer,
     setFeeQuote,
     setPaymentAuthorized,
+    setPayLater,
     resetPayment,
     setPropertyType,
     updatePropertyDetails,

@@ -144,6 +144,22 @@
     // On success the wizard advances to the confirmation step and this unmounts.
   }
 
+  /** "Pay later by text": submit unpaid. GlassReports texts the OSC payment link
+   *  once the office converts the booking to a scheduled job. We never confirm the
+   *  card here, so no hold is placed; the created intent simply expires unused. */
+  async function payLaterAndSubmit() {
+    phase = 'submitting';
+    payError = '';
+    intakeStore.setPayLater(true);
+    const ok = await intakeStore.submit();
+    if (!ok) {
+      intakeStore.setPayLater(false);
+      payError = state.submitError || 'We could not submit your request. Please try again.';
+      phase = 'card';
+    }
+    // On success the wizard advances to the confirmation step and this unmounts.
+  }
+
   onMount(() => {
     init();
   });
@@ -176,6 +192,17 @@
     <button type="button" class="primary pay-btn" on:click={payAndSubmit} disabled={phase === 'submitting'}>
       {phase === 'submitting' ? 'Processing…' : `Pay ${money(amount)} & submit request`}
     </button>
+
+    <div class="later-row">
+      <button type="button" class="later-btn" on:click={payLaterAndSubmit} disabled={phase === 'submitting'}>
+        Pay later — text me the link
+      </button>
+      <p class="muted small later-note">
+        We'll submit your request now and text a secure payment link
+        {#if state.customer.phone}to {state.customer.phone}{/if}
+        once your appointment is scheduled. The {money(amount)} is collected before we arrive.
+      </p>
+    </div>
   {/if}
 </section>
 
@@ -255,5 +282,33 @@
   .pay-btn:disabled {
     opacity: 0.7;
     cursor: default;
+  }
+
+  .later-row {
+    display: grid;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .later-btn {
+    justify-self: start;
+    background: transparent;
+    color: var(--color-primary);
+    font-weight: 600;
+    padding: 0.4rem 0;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .later-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .later-note {
+    font-size: 0.8rem;
+    line-height: 1.4;
   }
 </style>

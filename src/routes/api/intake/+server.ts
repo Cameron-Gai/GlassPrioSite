@@ -12,6 +12,7 @@ import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
 import { resolveFee } from '$lib/server/zoneFee';
 import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
 import { captureIntent, cancelIntent, getIntent } from '$lib/server/payments/stripe';
+import { registerDeferredOsc } from '$lib/server/oscRegister';
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
@@ -93,6 +94,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const fee = await resolveFee(payload.address.zip, payload.selectedJobType.name);
   const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior);
   const feeDue = fee.serviced && fee.osc > 0;
+  // Customer chose "Pay later" at the charge step: book unpaid and hand the OSC to
+  // GlassReports, which texts a Stripe link once the booking converts to a job.
+  const deferred = feeDue && payload.payLater === true;
 
   // Online collection is BEST-EFFORT and must never block a lead. If the customer
   // authorized a card hold at review, verify it (amount taken from the zone map —
@@ -141,7 +145,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     paid: authorizedIntentId !== null,
     paymentIntentId: authorizedIntentId,
     flag: fee.flag,
-    businessUnitId
+    businessUnitId,
+    deferred
   };
 
   const config = getServiceTitanConfig();
@@ -151,6 +156,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   // only on success; release the authorization hold on failure so a customer is
   // never charged without a booking.
   let confirmation: { confirmationNumber: string; extra: Record<string, unknown> };
+  let booked: { bookingId: number; externalId: string } | null = null;
   try {
     if (!config) {
       console.log('[api/intake] ServiceTitan not configured — returning mock confirmation', {
@@ -162,6 +168,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     } else {
       const result = await submitIntakeToServiceTitan(config, payload, photoUrls, feeCtx);
       console.log('[api/intake] ServiceTitan booking created', result);
+      booked = result;
       confirmation = {
         confirmationNumber: `GLASS-${result.bookingId}`,
         extra: {
@@ -207,6 +214,23 @@ export const POST: RequestHandler = async ({ request, url }) => {
         captureError
       });
     }
+  }
+
+  // Pay later: hand the deferred OSC to GlassReports so it texts the Stripe link
+  // once this booking converts to a scheduled job. Best-effort — the booking is
+  // already created, and the summary carries the PAY LATER note as a fallback.
+  if (deferred && booked) {
+    await registerDeferredOsc({
+      externalId: booked.externalId,
+      bookingId: booked.bookingId,
+      amount: fee.osc,
+      currency: fee.currency,
+      zip: payload.address.zip,
+      jobTypeId: fee.jobTypeId,
+      jobTypeName: payload.selectedJobType.name,
+      customerName: `${payload.customer.firstName} ${payload.customer.lastName}`.trim(),
+      phone: payload.customer.phone
+    });
   }
 
   return json({

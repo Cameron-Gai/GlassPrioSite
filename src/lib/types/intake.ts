@@ -139,5 +139,8 @@ export interface IntakePayload {
   schedulingPreference: SchedulingPreference;
   /** Stripe PaymentIntent id for the authorized on-site charge, when one was collected. */
   paymentIntentId?: string | null;
+  /** True when the customer chose "Pay later" — book unpaid; GlassReports texts the
+   *  OSC payment link once the booking is converted to a scheduled job. */
+  payLater?: boolean;
   createdAt: string;
 }

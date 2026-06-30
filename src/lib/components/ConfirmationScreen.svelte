@@ -99,6 +99,8 @@
         {money(charge.osc)}
         {#if state.paymentAuthorized}
           <span class="paid">Paid</span>
+        {:else if state.payLater}
+          <span class="later">We'll text you a link before your appointment</span>
         {:else}
           <span class="later">Collected at scheduling</span>
         {/if}
