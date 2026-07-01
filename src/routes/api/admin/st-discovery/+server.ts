@@ -228,7 +228,8 @@ export const GET: RequestHandler = async ({ url }) => {
     allStJobTypes: stJobTypes.map((jt) => ({ id: jt.id, name: jt.name, active: jt.active ?? null })),
     allCampaigns: activeCampaigns,
     // Build SERVICETITAN_BUSINESS_UNIT_IDS from these (group by Seattle/Tacoma →
-    // residential/commercial/interior).
+    // residential/commercial/interior/remote, where remote = the market's
+    // "Remote Consultation and Sales Department" BU).
     allBusinessUnits: businessUnits
       .filter((b) => b?.active !== false)
       .map((b) => ({ id: b.id, name: b.name })),

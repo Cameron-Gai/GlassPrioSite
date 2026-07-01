@@ -192,6 +192,10 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   // on this endpoint, verified on live bookings.
   lines.push(`[AUTOMATIC - PLEASE REVIEW] Web intake submission.`);
   lines.push(`Selected service: ${payload.selectedJobType.name}`);
+  // ServiceTitan does NOT prefill the Customer Type toggle on the booking
+  // conversion screen from the booking's customerType field, so call it out
+  // explicitly here for the CSR to set when creating the customer record.
+  lines.push(`Customer type: ${inferCustomerType(payload)} (set the Customer Type toggle to match)`);
   const fee = feeLine(feeCtx);
   if (fee) lines.push(fee);
   // Returning-customer linkage note for the CSR (ids also in externalData).

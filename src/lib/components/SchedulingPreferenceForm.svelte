@@ -8,25 +8,26 @@
   export let value: SchedulingPreference;
 
   // "As soon as possible / Today / Tomorrow" were removed on purpose — urgency is
-  // funneled into the paid Priority upgrade below rather than promised for free.
+  // funneled into the paid Priority option below rather than promised for free.
   const options: SchedulingPreference[] = ['This week', 'Next week', 'Flexible'];
   const priority = getPublicJobType('Priority Service (Business Hours)');
 
-  function select(option: SchedulingPreference) {
-    intakeStore.setSchedulingPreference(option);
-  }
-
   $: state = $intakeStore;
-  // Upsell visibility keys off the ORIGINAL job — accepting swaps selectedJobType
-  // to Priority Service, which is itself not upgradeable.
-  $: canUpgrade = !state.isEmergency && canUpgradeToPriority(state.originalJobType ?? state.selectedJobType);
-  $: upgraded = state.priorityUpgrade;
+  // Priority availability keys off the ORIGINAL job — choosing it swaps
+  // selectedJobType to Priority Service, which is itself not upgradeable.
+  $: canPriority = !state.isEmergency && canUpgradeToPriority(state.originalJobType ?? state.selectedJobType);
+  $: priorityChosen = state.priorityUpgrade;
 
-  function accept() {
+  // Priority is now the first timing option, not an add-on: picking it swaps in
+  // Priority Service and clears any standard window; picking a window backs it out.
+  function choosePriority() {
     intakeStore.acceptPriorityUpgrade();
+    intakeStore.setSchedulingPreference('');
   }
-  function undo() {
-    intakeStore.declinePriorityUpgrade();
+
+  function selectWindow(option: SchedulingPreference) {
+    if (priorityChosen) intakeStore.declinePriorityUpgrade();
+    intakeStore.setSchedulingPreference(option);
   }
 </script>
 
@@ -42,42 +43,41 @@
   </p>
 
   <div class="grid">
+    {#if canPriority}
+      <button
+        type="button"
+        class="tile priority"
+        class:active={priorityChosen}
+        on:click={choosePriority}
+      >
+        <span class="tile-head">
+          <span class="tile-title">Priority Service</span>
+          <PriorityBadge priority="Urgent" />
+        </span>
+        <span class="tile-desc">A professional on-site within 2 hours during business hours.</span>
+        <span class="chips">
+          <span class="chip price">{priority.pricing?.display ?? '$399'}</span>
+          {#if priority.pricing?.rebate}
+            <span class="chip rebate">{priority.pricing.rebate}</span>
+          {/if}
+        </span>
+        {#if priorityChosen}
+          <span class="tile-selected">✓ Selected — review the charge on the next step.</span>
+        {/if}
+      </button>
+    {/if}
+
     {#each options as option (option)}
       <button
         type="button"
         class="tile"
-        class:active={value === option}
-        on:click={() => select(option)}
+        class:active={!priorityChosen && value === option}
+        on:click={() => selectWindow(option)}
       >
         {option}
       </button>
     {/each}
   </div>
-
-  {#if canUpgrade}
-    <div class="upsell" class:accepted={upgraded}>
-      <div class="upsell-head">
-        <span class="upsell-title">Need it sooner?</span>
-        <PriorityBadge priority="Urgent" />
-      </div>
-      <p class="upsell-body">
-        Upgrade to <strong>Priority Service</strong> — a professional on-site within 2 hours during
-        business hours.
-      </p>
-      <div class="chips">
-        <span class="chip price">{priority.pricing?.display ?? '$399'}</span>
-        {#if priority.pricing?.rebate}
-          <span class="chip rebate">{priority.pricing.rebate}</span>
-        {/if}
-      </div>
-      {#if upgraded}
-        <p class="accepted-line">✓ Priority Service added. You can review the charge on the next step.</p>
-        <button type="button" class="link-btn" on:click={undo}>Remove priority upgrade</button>
-      {:else}
-        <button type="button" class="accept-btn" on:click={accept}>Add Priority Service</button>
-      {/if}
-    </div>
-  {/if}
 {/if}
 
 <style>
@@ -123,36 +123,33 @@
     background: var(--color-primary-soft);
   }
 
-  .upsell {
-    margin-top: 1rem;
+  /* Priority is a peer timing option, styled to stand out as the premium pick. */
+  .tile.priority {
     display: grid;
     gap: 0.5rem;
-    padding: 0.95rem 1.05rem;
-    border-radius: var(--radius-md);
     border: 1.5px solid var(--color-primary);
     background: linear-gradient(180deg, var(--color-primary-soft), #ffffff 80%);
-    box-shadow: var(--shadow-sm);
   }
 
-  .upsell.accepted {
+  .tile.priority.active {
     border-color: var(--color-accent);
     background: var(--color-accent-bg);
   }
 
-  .upsell-head {
+  .tile-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
   }
 
-  .upsell-title {
+  .tile-title {
     font-weight: 700;
     font-size: 1.02rem;
   }
 
-  .upsell-body {
-    margin: 0;
+  .tile-desc {
+    font-weight: 500;
     font-size: 0.9rem;
     color: var(--color-text);
   }
@@ -180,35 +177,9 @@
     color: var(--color-accent);
   }
 
-  .accept-btn {
-    justify-self: start;
-    padding: 0.6rem 1.1rem;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    background: var(--color-primary);
-    color: #fff;
-  }
-
-  .accept-btn:hover {
-    background: var(--color-primary-hover);
-  }
-
-  .accepted-line {
-    margin: 0;
+  .tile-selected {
     font-weight: 600;
     color: var(--color-accent);
     font-size: 0.9rem;
-  }
-
-  .link-btn {
-    justify-self: start;
-    color: var(--color-muted);
-    font-size: 0.85rem;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  .link-btn:hover {
-    color: var(--color-primary);
   }
 </style>

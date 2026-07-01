@@ -103,7 +103,7 @@
 
   <section class="block">
     <h3>Preferred window</h3>
-    <p>{state.schedulingPreference || '—'}</p>
+    <p>{state.priorityUpgrade ? 'Priority Service — within 2 hours' : state.schedulingPreference || '—'}</p>
   </section>
 
   <section class="block">

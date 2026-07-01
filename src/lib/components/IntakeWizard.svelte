@@ -63,8 +63,9 @@
           /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.customer.email.trim())
         );
       case 'scheduling':
-        // Emergencies skip picking a window (dispatch is immediate).
-        return state.isEmergency ? true : !!state.schedulingPreference;
+        // Emergencies skip picking a window (dispatch is immediate). Choosing
+        // Priority Service is a valid timing pick even though it sets no window.
+        return state.isEmergency ? true : !!state.schedulingPreference || state.priorityUpgrade;
       default:
         return true;
     }
@@ -311,7 +312,7 @@
       </header>
       <SchedulingPreferenceForm value={state.schedulingPreference} />
       {#if attempted && !isStepValid(state)}
-        <p class="form-error">Pick a preferred window to continue.</p>
+        <p class="form-error">Pick a timing option to continue.</p>
       {/if}
     {:else if state.step === 'review'}
       <header class="screen-head">

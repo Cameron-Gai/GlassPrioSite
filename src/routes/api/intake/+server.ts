@@ -88,15 +88,16 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
   // Resolve the on-site charge + the ZIP's market from the zone map (fails soft
   // to $0 + flag). The business unit is derived locally from the market +
-  // customer type + whether it's interior/architectural-glass work.
+  // customer type + whether it's interior/architectural-glass or a remote
+  // consultation (which routes to the market's Remote Consultation & Sales BU).
   const customerType = customerTypeForPropertyType(payload.propertyType);
   const interior = payload.selectedJobType.category === 'shower-mirror';
   const fee = await resolveFee(payload.address.zip, payload.selectedJobType.name);
-  const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior);
   const feeDue = fee.serviced && fee.osc > 0;
   // Customer opted into a remote consultation: the OSC is WAIVED until we roll a
   // truck, so nothing is collected online now and the booking notes say so.
   const remoteConsult = feeDue && payload.remoteConsult === true;
+  const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior, remoteConsult);
   // Customer chose "Pay later" at the charge step: book unpaid and hand the OSC to
   // GlassReports, which texts a Stripe link once the booking converts to a job.
   // (Remote-consult takes precedence — there's no charge to defer.)
