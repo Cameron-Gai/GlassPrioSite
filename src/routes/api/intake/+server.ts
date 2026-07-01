@@ -94,9 +94,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const fee = await resolveFee(payload.address.zip, payload.selectedJobType.name);
   const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior);
   const feeDue = fee.serviced && fee.osc > 0;
+  // Customer opted into a remote consultation: the OSC is WAIVED until we roll a
+  // truck, so nothing is collected online now and the booking notes say so.
+  const remoteConsult = feeDue && payload.remoteConsult === true;
   // Customer chose "Pay later" at the charge step: book unpaid and hand the OSC to
   // GlassReports, which texts a Stripe link once the booking converts to a job.
-  const deferred = feeDue && payload.payLater === true;
+  // (Remote-consult takes precedence — there's no charge to defer.)
+  const deferred = feeDue && !remoteConsult && payload.payLater === true;
 
   // Online collection is BEST-EFFORT and must never block a lead. If the customer
   // authorized a card hold at review, verify it (amount taken from the zone map —
@@ -105,7 +109,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   // let the office collect the OSC at scheduling.
   let authorizedIntentId: string | null = null;
   const intentId = (payload.paymentIntentId ?? '').trim();
-  if (feeDue && intentId) {
+  if (feeDue && !remoteConsult && intentId) {
     let intent;
     try {
       intent = await getIntent(intentId);
@@ -127,6 +131,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
       );
     }
     authorizedIntentId = intentId;
+  } else if (feeDue && remoteConsult) {
+    // OSC waived for a remote consultation — book unpaid; the charge only applies
+    // if/when a truck is rolled after the virtual review.
+    console.log('[api/intake] remote consultation — OSC waived; booking unpaid', {
+      osc: fee.osc,
+      zip: payload.address.zip
+    });
   } else if (feeDue) {
     // OSC due but nothing was authorized online — book unpaid; the office collects
     // at scheduling. (Mirrors the "we'll collect when scheduling" message the
@@ -146,7 +157,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     paymentIntentId: authorizedIntentId,
     flag: fee.flag,
     businessUnitId,
-    deferred
+    deferred,
+    remoteConsult
   };
 
   const config = getServiceTitanConfig();

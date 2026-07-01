@@ -20,6 +20,9 @@ export interface BookingFeeContext {
   /** Customer chose "Pay later": the OSC is collected by a texted Stripe link once
    *  the booking is converted to a scheduled job (the GlassReports OSC pipeline). */
   deferred?: boolean;
+  /** Customer opted into a remote (virtual) consultation: the OSC is waived until
+   *  we roll a truck, so nothing is collected online and the booking notes say so. */
+  remoteConsult?: boolean;
 }
 
 /**
@@ -139,6 +142,9 @@ function feeLine(feeCtx?: BookingFeeContext): string | null {
   if (!feeCtx) return null;
   const zone = feeCtx.zoneName ? ` (Zone ${feeCtx.zoneName})` : '';
   if (feeCtx.serviced && feeCtx.osc > 0) {
+    if (feeCtx.remoteConsult) {
+      return `On-site consultation charge: $${feeCtx.osc}${zone} - WAIVED, customer opted into a REMOTE consultation. Review the attached photos first; the charge applies only if/when a truck is rolled.`;
+    }
     if (feeCtx.paid) {
       return `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}).`;
     }
@@ -154,19 +160,30 @@ function feeLine(feeCtx?: BookingFeeContext): string | null {
 }
 
 /** Structured key/value pairs mirrored onto the booking (toggle with SERVICETITAN_BOOKING_EXTERNALDATA). */
-function buildExternalData(feeCtx?: BookingFeeContext): Array<{ key: string; value: string }> | undefined {
-  if (env.SERVICETITAN_BOOKING_EXTERNALDATA === '0' || !feeCtx) return undefined;
-  const data: Array<{ key: string; value: string }> = [
-    { key: 'osc_amount', value: String(feeCtx.osc) },
-    { key: 'osc_serviced', value: String(feeCtx.serviced) },
-  ];
-  if (feeCtx.zoneId) data.push({ key: 'osc_zone', value: feeCtx.zoneId });
-  if (feeCtx.paid && feeCtx.paymentIntentId) {
-    data.push({ key: 'osc_paid', value: 'true' });
-    data.push({ key: 'stripe_payment_intent', value: feeCtx.paymentIntentId });
+function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): Array<{ key: string; value: string }> | undefined {
+  if (env.SERVICETITAN_BOOKING_EXTERNALDATA === '0') return undefined;
+  const data: Array<{ key: string; value: string }> = [];
+  if (feeCtx) {
+    data.push({ key: 'osc_amount', value: String(feeCtx.osc) });
+    data.push({ key: 'osc_serviced', value: String(feeCtx.serviced) });
+    if (feeCtx.zoneId) data.push({ key: 'osc_zone', value: feeCtx.zoneId });
+    if (feeCtx.paid && feeCtx.paymentIntentId) {
+      data.push({ key: 'osc_paid', value: 'true' });
+      data.push({ key: 'stripe_payment_intent', value: feeCtx.paymentIntentId });
+    }
+    if (feeCtx.deferred) data.push({ key: 'osc_paylater', value: 'true' });
+    if (feeCtx.remoteConsult) data.push({ key: 'osc_remote_consult', value: 'true' });
   }
-  if (feeCtx.deferred) data.push({ key: 'osc_paylater', value: 'true' });
-  return data;
+  // Returning-customer linkage — lets the CSR (or an integration) attach this
+  // booking to the existing ServiceTitan record deterministically at conversion,
+  // instead of relying only on ServiceTitan's native dedupe.
+  const rc = payload.returningCustomer;
+  if (rc?.matched) {
+    data.push({ key: 'returning_customer', value: 'true' });
+    if (rc.customerId) data.push({ key: 'st_customer_id', value: String(rc.customerId) });
+    if (rc.locationId) data.push({ key: 'st_location_id', value: String(rc.locationId) });
+  }
+  return data.length ? data : undefined;
 }
 
 function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx?: BookingFeeContext): string {
@@ -177,6 +194,16 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   lines.push(`Selected service: ${payload.selectedJobType.name}`);
   const fee = feeLine(feeCtx);
   if (fee) lines.push(fee);
+  // Returning-customer linkage note for the CSR (ids also in externalData).
+  const rc = payload.returningCustomer;
+  if (rc?.matched) {
+    const ids: string[] = [];
+    if (rc.customerId) ids.push(`customer #${rc.customerId}`);
+    if (rc.locationId) ids.push(`location #${rc.locationId}`);
+    lines.push(
+      `RETURNING CUSTOMER - please link to existing ServiceTitan ${ids.length ? ids.join(', ') : 'record'} on conversion (matched by 2+ of phone/email/name/address).`
+    );
+  }
   if (payload.routing.isEmergency) {
     lines.push(
       payload.routing.isDuringBusinessHours
@@ -273,7 +300,7 @@ export async function submitIntakeToServiceTitan(
   // Optional jobTypeId pre-fill — the CSR confirms/overrides at conversion, so
   // a missing mapping is not a blocker in this flow.
   const resolution = resolveJobTypeId(payload.selectedJobType.name, config.jobTypeIdOverrides);
-  const externalData = buildExternalData(feeCtx);
+  const externalData = buildExternalData(payload, feeCtx);
 
   const booking: STCreateBookingRequest = {
     source: 'customer-intake-site',
@@ -283,7 +310,9 @@ export async function submitIntakeToServiceTitan(
     contacts: buildContacts(payload),
     customerType: inferCustomerType(payload),
     priority: (payload.selectedJobType.priority || 'Normal') as STCreateBookingRequest['priority'],
-    isFirstTimeClient: true,
+    // Reflect the returning-customer lookup: a recognized customer must not be
+    // flagged first-time (that corrupts first-vs-repeat reporting + attribution).
+    isFirstTimeClient: !(payload.returningCustomer?.matched === true),
     externalId,
     // CSR contact comes through ST's own workflow; don't fire an automated
     // confirmation email the office hasn't reviewed.

@@ -108,7 +108,8 @@ export const testPresets: IntakePreset[] = [
       hasBrokenGlass: true,
       hasWaterOrWeatherEntry: true
     },
-    schedulingPreference: 'As soon as possible'
+    // Emergencies aren't asked for a window (dispatch is immediate), so none is set.
+    schedulingPreference: ''
   },
   {
     id: 'redmond-shower-interior',

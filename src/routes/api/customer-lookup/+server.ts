@@ -1,13 +1,27 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getServiceTitanConfig, findReturningCustomer } from '$lib/server/servicetitan';
+import { getServiceTitanConfig, findReturningCustomer, type ReturningLookupInput } from '$lib/server/servicetitan';
 import { rateLimit } from '$lib/server/rateLimit';
 
+/** Coerce a request body into the returning-lookup input shape (all fields optional). */
+function parseInput(body: unknown): ReturningLookupInput {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const addr = (b.address ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  return {
+    phone: str(b.phone),
+    email: str(b.email),
+    firstName: str(b.firstName),
+    lastName: str(b.lastName),
+    address: { street: str(addr.street), city: str(addr.city), state: str(addr.state), zip: str(addr.zip) }
+  };
+}
+
 /**
- * Step 1 of returning-customer autofill: confirm a two-factor (phone + email)
- * match exists and return ONLY the first name, so the form can greet the
- * customer. No address or other PII is returned here — that waits for an
- * explicit opt-in via /api/customer-prefill.
+ * Step 1 of returning-customer autofill: confirm a two-factor (any 2 of phone /
+ * email / name / address) match exists and return ONLY the first name, so the
+ * form can greet the customer. No address, customer id, or other linkage data is
+ * returned here — that waits for an explicit opt-in via /api/customer-prefill.
  */
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   const limit = rateLimit(`lookup:${getClientAddress()}`, 10, 60_000);
@@ -18,16 +32,15 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   const config = getServiceTitanConfig();
   if (!config) return json({ matched: false });
 
-  let body: { phone?: string; email?: string };
+  let body: unknown;
   try {
-    body = (await request.json()) as { phone?: string; email?: string };
+    body = await request.json();
   } catch {
     return json({ matched: false });
   }
-  if (!body.phone || !body.email) return json({ matched: false });
 
   try {
-    const match = await findReturningCustomer(config, body.phone, body.email);
+    const match = await findReturningCustomer(config, parseInput(body));
     return json({ matched: !!match, firstName: match?.firstName ?? null });
   } catch (error) {
     console.error('[api/customer-lookup] error', error);

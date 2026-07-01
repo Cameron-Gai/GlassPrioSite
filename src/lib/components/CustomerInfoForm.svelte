@@ -15,11 +15,9 @@
     phone: !/^[0-9+\-\s().]{7,}$/.test(value.phone.trim()),
     email: !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email.trim())
   };
-
-  // The returning-customer lookup now runs on a dedicated "Is this you?" step
-  // (after Continue), so it checks the final phone+email instead of racing the
-  // user mid-type. Here we only surface a confirmation once it's been applied.
-  $: returning = $intakeStore.returning;
+  // The returning-customer lookup + "Is this you?" prompt and the applied
+  // confirmation are rendered by the wizard on this same step (it owns the
+  // background lookup and gating), so this form only handles the fields.
 </script>
 
 <div class="grid">
@@ -73,10 +71,6 @@
     />
     {#if showErrors && errors.email}<p class="error">Enter a valid email</p>{/if}
   </div>
-
-  {#if returning.status === 'applied'}
-    <p class="applied">✓ Filled in from your account — double-check it's right below.</p>
-  {/if}
 </div>
 
 <style>
@@ -93,13 +87,6 @@
     color: var(--color-emergency);
     margin: 0.3rem 0 0;
     font-size: 0.85rem;
-  }
-
-  .applied {
-    margin: 0;
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: var(--color-accent);
   }
 
   @media (max-width: 520px) {

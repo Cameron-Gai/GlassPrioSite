@@ -4,6 +4,7 @@
   import type { Stripe, StripeElements } from '@stripe/stripe-js';
   import { intakeStore } from '$lib/stores/intakeStore';
   import type { IntakeState } from '$lib/stores/intakeStore';
+  import PhotoUploadMock from './PhotoUploadMock.svelte';
 
   export let state: IntakeState;
 
@@ -14,6 +15,9 @@
   let zoneName: string | null = null;
   let infoText = '';
   let payError = '';
+  /** Remote-consultation opt-in: waive the on-site charge, require a photo. */
+  let showRemote = false;
+  let remoteError = '';
   /** Operator-facing diagnostic. Only rendered when the server reports
    *  debug mode (PAYMENT_DEBUG=true), so customers never see internals. */
   let diagnostic = '';
@@ -160,6 +164,26 @@
     // On success the wizard advances to the confirmation step and this unmounts.
   }
 
+  /** Remote consultation: waive the on-site charge (until we roll a truck) and
+   *  submit unpaid. A photo is required, so we gate on it here. */
+  async function remoteAndSubmit() {
+    if (state.issueDetails.photos.length === 0) {
+      remoteError = 'Please add at least one photo so we can start the remote consultation.';
+      return;
+    }
+    remoteError = '';
+    phase = 'submitting';
+    payError = '';
+    intakeStore.setRemoteConsult(true);
+    const ok = await intakeStore.submit();
+    if (!ok) {
+      intakeStore.setRemoteConsult(false);
+      payError = state.submitError || 'We could not submit your request. Please try again.';
+      phase = 'card';
+    }
+    // On success the wizard advances to the confirmation step and this unmounts.
+  }
+
   onMount(() => {
     init();
   });
@@ -202,6 +226,34 @@
         {#if state.customer.phone}to {state.customer.phone}{/if}
         once your appointment is scheduled. The {money(amount)} is collected before we arrive.
       </p>
+    </div>
+
+    <div class="remote-row">
+      <button
+        type="button"
+        class="later-btn"
+        aria-expanded={showRemote}
+        on:click={() => (showRemote = !showRemote)}
+        disabled={phase === 'submitting'}
+      >
+        Prefer a remote consultation? Skip the {money(amount)} visit charge
+      </button>
+      {#if showRemote}
+        <p class="muted small later-note">
+          We'll review your photos first and only charge the {money(amount)} if we need to send a
+          technician on-site. At least one photo is required.
+        </p>
+        <PhotoUploadMock photos={state.issueDetails.photos} />
+        {#if remoteError}<p class="pay-error">{remoteError}</p>{/if}
+        <button
+          type="button"
+          class="remote-submit"
+          on:click={remoteAndSubmit}
+          disabled={phase === 'submitting'}
+        >
+          Submit for remote consultation — no charge now
+        </button>
+      {/if}
     </div>
   {/if}
 </section>
@@ -310,5 +362,33 @@
   .later-note {
     font-size: 0.8rem;
     line-height: 1.4;
+  }
+
+  .remote-row {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .remote-submit {
+    justify-self: start;
+    margin-top: 0.2rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    background: var(--color-surface-tint, var(--color-primary-soft));
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+  }
+
+  .remote-submit:hover:not(:disabled) {
+    background: var(--color-primary-soft);
+  }
+
+  .remote-submit:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 </style>

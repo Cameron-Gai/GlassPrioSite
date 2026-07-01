@@ -7,10 +7,10 @@ export type PropertyType =
   | 'Other'
   | '';
 
+// "As soon as possible", "Today", and "Tomorrow" were intentionally removed:
+// urgency is funneled into the paid Priority Service upgrade offered on this same
+// step, so we no longer promise same-/next-day timing as a free scheduling choice.
 export type SchedulingPreference =
-  | 'As soon as possible'
-  | 'Today'
-  | 'Tomorrow'
   | 'This week'
   | 'Next week'
   | 'Flexible'
@@ -142,5 +142,16 @@ export interface IntakePayload {
   /** True when the customer chose "Pay later" — book unpaid; GlassReports texts the
    *  OSC payment link once the booking is converted to a scheduled job. */
   payLater?: boolean;
+  /** True when the customer opted into a remote (virtual) consultation instead of an
+   *  on-site visit: the OSC is waived until we roll a truck, and a photo is required. */
+  remoteConsult?: boolean;
+  /** Set when the returning-customer lookup matched an existing ServiceTitan record.
+   *  Lets the booking flag first-time correctly and link to the right customer at
+   *  conversion instead of relying solely on ServiceTitan's native dedupe. */
+  returningCustomer?: {
+    matched: boolean;
+    customerId: number | null;
+    locationId: number | null;
+  };
   createdAt: string;
 }

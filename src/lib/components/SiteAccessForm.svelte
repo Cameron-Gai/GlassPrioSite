@@ -133,8 +133,8 @@
     </h3>
     {#if photosRequired}
       <p class="hint">
-        For showers and mirrors we start with a virtual consultation, so a few clear photos help us
-        get you a rough estimate fast.
+        This service starts with a remote consultation, so a few clear photos are required to give
+        you a rough estimate before any on-site visit.
       </p>
     {:else}
       <p class="hint">Photos help our team triage and quote faster.</p>

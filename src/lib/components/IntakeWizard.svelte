@@ -4,56 +4,50 @@
     intakeStore,
     currentTriageNode,
     currentPhaseIndex,
-    type WizardStep
+    type WizardStep,
+    type IntakeState
   } from '$lib/stores/intakeStore';
   import { testPresets } from '$lib/data/testPresets';
   import QuestionCard from './QuestionCard.svelte';
   import PhaseStepper from './PhaseStepper.svelte';
   import JobTypeBanner from './JobTypeBanner.svelte';
-  import PriorityUpgradeAsk from './PriorityUpgradeAsk.svelte';
   import PropertyTypeForm from './PropertyTypeForm.svelte';
   import IssueDetailsForm from './IssueDetailsForm.svelte';
   import SiteAccessForm from './SiteAccessForm.svelte';
   import CustomerInfoForm from './CustomerInfoForm.svelte';
-  import ReturningCustomerCheck from './ReturningCustomerCheck.svelte';
   import AddressForm from './AddressForm.svelte';
   import SchedulingPreferenceForm from './SchedulingPreferenceForm.svelte';
   import ReviewSubmission from './ReviewSubmission.svelte';
   import ConfirmationScreen from './ConfirmationScreen.svelte';
 
+  const SUPPORT_PHONE = '(206) 508-2444';
+  const SUPPORT_PHONE_HREF = 'tel:+12065082444';
+
   const stepLabels: Record<WizardStep, string> = {
     triage: 'Tell us what you need',
     'property-type': 'Property type',
-    'priority-upgrade': 'Choose your timing',
     issue: "What's going on",
     site: 'Property & access',
-    contact: 'Your contact info',
-    'returning-check': 'Is this you?',
     address: 'Service address',
-    scheduling: 'When works best',
+    contact: 'Your contact info',
+    scheduling: 'Timing',
     review: 'Review & submit',
     confirmation: 'Done'
   };
 
-  function isStepValid(state: typeof $intakeStore): boolean {
+  function photosRequiredFor(state: IntakeState): boolean {
+    return state.selectedJobType?.requiresPhoto === true;
+  }
+
+  function isStepValid(state: IntakeState): boolean {
     switch (state.step) {
       case 'property-type':
         return !!state.propertyType;
       case 'issue':
-        // All issue-step fields are optional by design — a nudge encourages
-        // detail, but nothing here blocks the customer from continuing.
+        // All issue-step fields are optional by design.
         return true;
-      case 'site': {
-        const photosRequired = state.selectedJobType?.consultationFormat === 'virtual';
-        return !photosRequired || state.issueDetails.photos.length > 0;
-      }
-      case 'contact':
-        return (
-          state.customer.firstName.trim() !== '' &&
-          state.customer.lastName.trim() !== '' &&
-          /^[0-9+\-\s().]{7,}$/.test(state.customer.phone.trim()) &&
-          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.customer.email.trim())
-        );
+      case 'site':
+        return !photosRequiredFor(state) || state.issueDetails.photos.length > 0;
       case 'address':
         return (
           state.address.street.trim() !== '' &&
@@ -61,8 +55,16 @@
           state.address.state.trim() !== '' &&
           /^\d{5}(-\d{4})?$/.test(state.address.zip.trim())
         );
+      case 'contact':
+        return (
+          state.customer.firstName.trim() !== '' &&
+          state.customer.lastName.trim() !== '' &&
+          /^[0-9+\-\s().]{7,}$/.test(state.customer.phone.trim()) &&
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.customer.email.trim())
+        );
       case 'scheduling':
-        return !!state.schedulingPreference;
+        // Emergencies skip picking a window (dispatch is immediate).
+        return state.isEmergency ? true : !!state.schedulingPreference;
       default:
         return true;
     }
@@ -70,12 +72,60 @@
 
   let attempted = false;
 
+  // --- Returning-customer lookup gating on the contact step -----------------
+  // The lookup runs in the background once we have 2+ identifying fields, and the
+  // customer can't leave the contact step until it resolves (or we give up).
+  let lookupTimer: ReturnType<typeof setTimeout> | null = null;
+  let slowTimer: ReturnType<typeof setTimeout> | null = null;
+  let allowSkipCheck = false;
+
+  function scheduleLookup(s: IntakeState) {
+    if (s.step !== 'contact') {
+      if (lookupTimer) {
+        clearTimeout(lookupTimer);
+        lookupTimer = null;
+      }
+      return;
+    }
+    if (s.returning.status !== 'idle') return;
+    if (!intakeStore.canRunReturningLookup(s)) return;
+    if (lookupTimer) clearTimeout(lookupTimer);
+    lookupTimer = setTimeout(() => {
+      lookupTimer = null;
+      intakeStore.lookupReturningCustomer();
+    }, 600);
+  }
+
+  // Escape hatch: if ServiceTitan is slow/unreachable, let them continue rather
+  // than strand them on a spinner.
+  function trackSlow(status: string) {
+    if (status === 'checking') {
+      if (!slowTimer) slowTimer = setTimeout(() => (allowSkipCheck = true), 5000);
+    } else {
+      if (slowTimer) {
+        clearTimeout(slowTimer);
+        slowTimer = null;
+      }
+      allowSkipCheck = false;
+    }
+  }
+
   function next() {
-    if (!isStepValid($intakeStore)) {
+    const s = $intakeStore;
+    if (!isStepValid(s)) {
       attempted = true;
       return;
     }
     attempted = false;
+    if (s.step === 'contact') {
+      const st = s.returning.status;
+      if (st === 'idle') {
+        intakeStore.lookupReturningCustomer();
+        return;
+      }
+      if (st === 'checking' && !allowSkipCheck) return;
+      if (st === 'found') return; // must answer the inline prompt first
+    }
     intakeStore.advance();
   }
 
@@ -93,34 +143,64 @@
     attempted = false;
   }
 
-  // Test-mode only: the server tells us whether to surface the preset panel
-  // (true unless STRIPE_MODE=live). Customers in live mode never see it.
+  function confirmReturning() {
+    // Stay on the step so the "linked" confirmation is visible; Continue advances.
+    intakeStore.applyReturningCustomer();
+  }
+
+  function denyReturning() {
+    intakeStore.dismissReturningCustomer();
+  }
+
+  // Test-mode + ServiceTitan availability come from the server. `serviceReady`
+  // defaults true so the form shows instantly; a "down" response replaces it with
+  // the call-us screen (rare, so a brief flash beats delaying every page load).
   let testMode = false;
+  let serviceReady = true;
+
   onMount(async () => {
+    // Restore any saved draft, then start persisting.
+    intakeStore.hydrate();
     try {
       const res = await fetch('/api/config');
-      if (res.ok) testMode = (await res.json()).testMode === true;
+      if (res.ok) {
+        const cfg = await res.json();
+        testMode = cfg.testMode === true;
+        serviceReady = cfg.serviceTitanReady !== false;
+      }
     } catch {
-      // Config fetch is best-effort; default to hidden.
+      // Best-effort; leave the form enabled.
     }
   });
 
   $: state = $intakeStore;
   $: node = $currentTriageNode;
   $: phaseIdx = $currentPhaseIndex;
-  $: photosRequired = state.selectedJobType?.consultationFormat === 'virtual';
+  $: photosRequired = photosRequiredFor(state);
+  $: scheduleLookup(state);
+  $: trackSlow(state.returning.status);
   $: canGoBack =
     state.step !== 'confirmation' &&
     (state.step !== 'triage' || state.triageHistory.length > 0);
   $: showBanner =
     state.selectedJobType &&
     state.step !== 'triage' &&
-    state.step !== 'priority-upgrade' &&
-    state.step !== 'returning-check' &&
     state.step !== 'review' &&
     state.step !== 'confirmation';
 </script>
 
+{#if !serviceReady}
+  <div class="down">
+    <span class="down-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+      </svg>
+    </span>
+    <h2>Online booking is briefly unavailable</h2>
+    <p>Our scheduling system isn't reachable right now. Please give us a call and we'll get you taken care of right away.</p>
+    <a class="call-btn" href={SUPPORT_PHONE_HREF}>Call {SUPPORT_PHONE}</a>
+  </div>
+{:else}
 <div class="wizard">
   {#if testMode && state.step === 'triage'}
     <div class="test-presets">
@@ -169,8 +249,6 @@
       {#if attempted && !isStepValid(state)}
         <p class="form-error">Please pick a property type to continue.</p>
       {/if}
-    {:else if state.step === 'priority-upgrade'}
-      <PriorityUpgradeAsk />
     {:else if state.step === 'issue'}
       <header class="screen-head">
         <h2>Tell us what's going on</h2>
@@ -188,18 +266,45 @@
         {photosRequired}
         showErrors={attempted}
       />
-    {:else if state.step === 'contact'}
-      <header class="screen-head">
-        <h2>How can we reach you?</h2>
-      </header>
-      <CustomerInfoForm value={state.customer} showErrors={attempted} />
-    {:else if state.step === 'returning-check'}
-      <ReturningCustomerCheck {state} />
     {:else if state.step === 'address'}
       <header class="screen-head">
         <h2>Where is the service needed?</h2>
       </header>
       <AddressForm value={state.address} showErrors={attempted} />
+    {:else if state.step === 'contact'}
+      <header class="screen-head">
+        <h2>How can we reach you?</h2>
+      </header>
+      <CustomerInfoForm value={state.customer} showErrors={attempted} />
+
+      {#if state.returning.status === 'checking'}
+        <p class="rc-line checking" aria-live="polite">
+          <span class="rc-spinner" aria-hidden="true"></span>
+          Checking for your account…
+          {#if allowSkipCheck}
+            <button type="button" class="rc-skip" on:click={() => intakeStore.advance()}>Continue without waiting</button>
+          {/if}
+        </p>
+      {:else if state.returning.status === 'found'}
+        <div class="rc-prompt fade-in" aria-live="polite">
+          <p class="rc-q">
+            {#if state.returning.firstName}
+              Welcome back, <strong>{state.returning.firstName}</strong>! Is this your account?
+            {:else}
+              We found an account matching your details. Is this you?
+            {/if}
+          </p>
+          <p class="rc-sub">We'll link this request to your file and fill in anything you left blank.</p>
+          <div class="rc-actions">
+            <button type="button" class="rc-yes" on:click={confirmReturning}>Yes, that's me</button>
+            <button type="button" class="rc-no" on:click={denyReturning}>No, I'm new here</button>
+          </div>
+        </div>
+      {:else if state.returning.status === 'applied'}
+        <p class="rc-line applied" aria-live="polite">
+          ✓ Linked to your account{#if state.returning.firstName}, {state.returning.firstName}{/if} — we filled in any blanks. Double-check it's right, then continue.
+        </p>
+      {/if}
     {:else if state.step === 'scheduling'}
       <header class="screen-head">
         <h2>When would you prefer to be contacted or seen?</h2>
@@ -215,7 +320,11 @@
       </header>
       <ReviewSubmission {state} />
       {#if state.submitError && !state.feeQuote?.paymentRequired}
-        <p class="form-error">{state.submitError}</p>
+        <p class="form-error">
+          {state.submitError}
+          <br />
+          You can also call us at <a href={SUPPORT_PHONE_HREF}>{SUPPORT_PHONE}</a>.
+        </p>
       {/if}
     {:else if state.step === 'confirmation'}
       <ConfirmationScreen {state} onReset={reset} />
@@ -230,7 +339,10 @@
          wizard only shows its own Submit for free/no-charge requests. -->
     {@const showWizardSubmit = atReview && feeResolved && !feeDue}
     {@const showFeeLoading = atReview && !feeResolved}
-    {@const showContinue = !['triage', 'priority-upgrade', 'returning-check', 'review'].includes(state.step)}
+    {@const showContinue = !['triage', 'review'].includes(state.step)}
+    {@const contactChecking =
+      state.step === 'contact' && state.returning.status === 'checking' && !allowSkipCheck}
+    {@const contactFound = state.step === 'contact' && state.returning.status === 'found'}
     {@const showActions = canGoBack || showWizardSubmit || showContinue || showFeeLoading}
     {#if showActions}
       <div class="actions" class:back-only={canGoBack && !showWizardSubmit && !showContinue && !showFeeLoading}>
@@ -244,12 +356,20 @@
         {:else if showFeeLoading}
           <button type="button" class="primary" disabled>Checking your area…</button>
         {:else if showContinue}
-          <button type="button" class="primary" on:click={next}>Continue</button>
+          <button
+            type="button"
+            class="primary"
+            on:click={next}
+            disabled={contactChecking || contactFound}
+          >
+            {contactChecking ? 'Checking your account…' : 'Continue'}
+          </button>
         {/if}
       </div>
     {/if}
   {/if}
 </div>
+{/if}
 
 <style>
   .wizard {
@@ -258,9 +378,53 @@
     gap: 1.1rem;
   }
 
-  /* Test-mode preset panel — dashed, high-contrast so it's obviously a dev tool
-     and never mistaken for customer UI. Only renders when /api/config reports
-     test mode (STRIPE_MODE !== 'live'). */
+  /* ServiceTitan-down fallback — the whole form is replaced with a call-us card. */
+  .down {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+    gap: 0.6rem;
+    padding: 1.5rem 1rem;
+  }
+
+  .down-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+  }
+
+  .down h2 {
+    margin: 0;
+    font-size: 1.35rem;
+  }
+
+  .down p {
+    margin: 0;
+    color: var(--color-muted);
+    max-width: 420px;
+  }
+
+  .call-btn {
+    margin-top: 0.4rem;
+    display: inline-block;
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 700;
+    padding: 0.85rem 1.5rem;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+  }
+
+  .call-btn:hover {
+    background: var(--color-primary-hover);
+  }
+
+  /* Test-mode preset panel — dashed, high-contrast so it's obviously a dev tool. */
   .test-presets {
     border: 1.5px dashed #c026a3;
     background: #fdf4ff;
@@ -363,6 +527,111 @@
     font-size: 0.9rem;
   }
 
+  .form-error a {
+    color: var(--color-primary);
+  }
+
+  /* Returning-customer inline UI (folded into the contact step). */
+  .rc-line {
+    margin: 0.85rem 0 0;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .rc-line.checking {
+    color: var(--color-muted);
+  }
+
+  .rc-line.applied {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .rc-spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--color-primary-soft);
+    border-top-color: var(--color-primary);
+    animation: rc-spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes rc-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .rc-skip {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .rc-skip:hover {
+    color: var(--color-primary);
+  }
+
+  .rc-prompt {
+    margin-top: 0.9rem;
+    padding: 0.9rem 1rem;
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-soft);
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .rc-q {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 600;
+  }
+
+  .rc-sub {
+    margin: 0;
+    font-size: 0.86rem;
+    color: var(--color-muted);
+  }
+
+  .rc-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.35rem;
+  }
+
+  .rc-yes,
+  .rc-no {
+    padding: 0.6rem 1.1rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+  }
+
+  .rc-yes {
+    background: var(--color-primary);
+    color: #fff;
+  }
+
+  .rc-yes:hover {
+    background: var(--color-primary-hover);
+  }
+
+  .rc-no {
+    background: transparent;
+    color: var(--color-primary);
+    border: 1px solid var(--color-border);
+  }
+
+  .rc-no:hover {
+    border-color: var(--color-primary);
+  }
+
   .actions {
     display: flex;
     gap: 0.6rem;
@@ -391,6 +660,11 @@
   .primary:hover:not(:disabled) {
     background: var(--color-primary-hover);
     transform: translateY(-1px);
+  }
+
+  .primary:disabled {
+    opacity: 0.75;
+    cursor: default;
   }
 
   .ghost {

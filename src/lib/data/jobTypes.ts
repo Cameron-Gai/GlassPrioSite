@@ -26,6 +26,13 @@ export interface JobType {
   includes?: string[];
   pricing?: PricingInfo;
   consultationFormat?: ConsultationFormat;
+  /**
+   * When true, the intake requires at least one photo before the customer can
+   * continue past the site step. Used for services that always begin with a
+   * remote consultation (shower enclosures). Mirrors are virtual too but photos
+   * are optional there — they can send them later.
+   */
+  requiresPhoto?: boolean;
 }
 
 export const jobTypes: JobType[] = [
@@ -79,7 +86,9 @@ export const jobTypes: JobType[] = [
       detail:
         'A $125 non-refundable deposit is collected when you accept the rough estimate. It is applied toward the final invoice.'
     },
-    consultationFormat: 'virtual'
+    consultationFormat: 'virtual',
+    // Showers always start with a remote consultation, so a photo is required.
+    requiresPhoto: true
   },
   {
     name: 'Custom Shower Enclosure - Installation',

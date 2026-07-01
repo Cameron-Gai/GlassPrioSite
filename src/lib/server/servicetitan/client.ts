@@ -126,6 +126,20 @@ export function clearTokenCache(): void {
   tokenCache = null;
 }
 
+/**
+ * Lightweight reachability/auth check for health gating: resolves true when we
+ * can obtain an access token (ServiceTitan auth is reachable and the credentials
+ * are valid). Uses the normal token cache, so it's near-free when already warm.
+ */
+export async function pingServiceTitanAuth(config: ServiceTitanConfig): Promise<boolean> {
+  try {
+    await fetchAccessToken(config);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   query?: Record<string, string | number | undefined>;

@@ -5,6 +5,8 @@
   export let state: IntakeState;
   export let onReset: () => void;
 
+  const SUPPORT_PHONE = '(206) 508-2444';
+  const SUPPORT_PHONE_HREF = 'tel:+12065082444';
   const money = (n: number) => `$${n.toLocaleString()}`;
   $: charge = state.feeQuote && state.feeQuote.osc > 0 ? state.feeQuote : null;
 
@@ -25,6 +27,13 @@
             'A professional will be on-site within 3 hours, after business hours',
             'On arrival we will clean up, board up if needed, and quote any repair'
           ];
+    }
+    if (s.remoteConsult) {
+      return [
+        'A team member will review the photos you sent and start a remote consultation',
+        'We will share a rough estimate — no on-site charge for the remote review',
+        'If an on-site visit is needed, the visit charge applies only then, and we will confirm first'
+      ];
     }
     if (job.category === 'other') {
       return [
@@ -84,11 +93,12 @@
 
   <p class="note">
     {#if state.isEmergency}
-      If conditions worsen, call 911 first, then our emergency line.
+      If conditions worsen, call 911 first, then our emergency line at
+      <a href={SUPPORT_PHONE_HREF}>{SUPPORT_PHONE}</a>.
     {:else}
       We'll text and email
       <strong>{state.customer.email || 'you'}</strong>
-      with updates.
+      with updates. Questions? Call us at <a href={SUPPORT_PHONE_HREF}>{SUPPORT_PHONE}</a>.
     {/if}
   </p>
 
@@ -99,6 +109,8 @@
         {money(charge.osc)}
         {#if state.paymentAuthorized}
           <span class="paid">Paid</span>
+        {:else if state.remoteConsult}
+          <span class="later">Waived — remote consultation first</span>
         {:else if state.payLater}
           <span class="later">We'll text you a link before your appointment</span>
         {:else}
