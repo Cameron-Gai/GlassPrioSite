@@ -157,8 +157,7 @@ export const jobTypes: JobType[] = [
     includes: ['On-site assessment', 'Measurements taken', 'Written quote provided'],
     pricing: {
       display: '$45 trip charge',
-      detail:
-        'Waived if you are in Zone 1. Credited toward the repair when you proceed.',
+      detail: 'Credited toward the repair when you proceed.',
       rebate: 'Credited toward repair'
     },
     consultationFormat: 'on-site'
@@ -182,8 +181,7 @@ export const jobTypes: JobType[] = [
     summary: 'On-site assessment and quote for replacing five or more panes / IG units.',
     includes: ['On-site assessment', 'Measurements for all panes', 'Written quote provided'],
     pricing: {
-      display: 'Free consultation',
-      detail: 'Free except in Zone 3.'
+      display: 'Free consultation'
     },
     consultationFormat: 'on-site'
   },
