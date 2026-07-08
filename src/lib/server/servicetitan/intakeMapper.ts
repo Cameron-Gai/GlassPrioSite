@@ -3,6 +3,7 @@ import type { IntakePayload } from '$lib/types/intake';
 import type { ServiceTitanConfig } from './config';
 import { resolveJobTypeId } from './jobTypeMap';
 import { ServiceTitanError, stRequest } from './client';
+import { buildBookingStart } from './bookingSchedule';
 
 /** On-site-charge context resolved from the GlassReports zone map, attached to the booking. */
 export interface BookingFeeContext {
@@ -54,6 +55,8 @@ interface STBookingAddress {
 interface STBookingContact {
   type: 'Phone' | 'MobilePhone' | 'Email';
   value: string;
+  /** Contact note shown in ServiceTitan; labels the on-site contact entry. */
+  memo?: string;
 }
 
 interface STCreateBookingRequest {
@@ -66,6 +69,10 @@ interface STCreateBookingRequest {
   priority: 'Urgent' | 'High' | 'Normal' | 'Low';
   isFirstTimeClient: boolean;
   externalId: string;
+  // Requested service datetime (RFC3339). Prefills the Start Date on the
+  // booking-conversion screen (otherwise it renders a null date); derived from
+  // the customer's scheduling preference + preferred arrival window.
+  start?: string;
   isSendConfirmationEmail: boolean;
   campaignId?: number;
   jobTypeId?: number;
@@ -107,6 +114,20 @@ function buildContacts(payload: IntakePayload): STBookingContact[] {
   if (phone) contacts.push({ type: 'MobilePhone', value: phone });
   if (payload.customer.email.trim()) {
     contacts.push({ type: 'Email', value: payload.customer.email.trim() });
+  }
+  // The person who'll actually be at the property, when different from the
+  // requester — labeled via memo so the CSR can copy it into the job's
+  // On-Site Contact field at conversion.
+  const oc = payload.onSiteContact;
+  if (oc.differs) {
+    const ocPhone = normalizePhone(oc.phone);
+    if (ocPhone && ocPhone !== phone) {
+      contacts.push({
+        type: 'Phone',
+        value: ocPhone,
+        memo: toAscii(`On-site contact${oc.name.trim() ? `: ${oc.name.trim()}` : ''}`)
+      });
+    }
   }
   return contacts;
 }
@@ -306,6 +327,8 @@ export async function submitIntakeToServiceTitan(
   const resolution = resolveJobTypeId(payload.selectedJobType.name, config.jobTypeIdOverrides);
   const externalData = buildExternalData(payload, feeCtx);
 
+  const start = buildBookingStart(payload.schedulingPreference, payload.specialInstructions.preferredWindow);
+
   const booking: STCreateBookingRequest = {
     source: 'customer-intake-site',
     name: fullName || 'Web intake customer',
@@ -321,6 +344,7 @@ export async function submitIntakeToServiceTitan(
     // CSR contact comes through ST's own workflow; don't fire an automated
     // confirmation email the office hasn't reviewed.
     isSendConfirmationEmail: false,
+    ...(start ? { start } : {}),
     ...(config.campaignId !== null ? { campaignId: config.campaignId } : {}),
     ...(resolution.id !== null ? { jobTypeId: resolution.id } : {}),
     ...(feeCtx?.businessUnitId ? { businessUnitId: feeCtx.businessUnitId } : {}),
@@ -331,38 +355,58 @@ export async function submitIntakeToServiceTitan(
   // some expose a provider-scoped path, others take bookingProviderId in the
   // body. Try candidates in order; 404 "Unable to match incoming request to an
   // operation" means wrong path, so fall through. Any other error is real.
-  const candidates: Array<{ resource: string; body: STCreateBookingRequest }> = [
-    {
-      resource: `booking-provider/${config.bookingProviderId}/bookings`,
-      body: booking
-    },
-    {
-      resource: 'bookings',
-      body: { ...booking, bookingProviderId: config.bookingProviderId }
-    }
-  ];
-
-  let lastError: ServiceTitanError | null = null;
-  for (const candidate of candidates) {
-    try {
-      const created = await stRequest<STBookingResponse>(config, 'crm/v2', candidate.resource, {
-        method: 'POST',
-        body: candidate.body
-      });
-      return { bookingId: created.id, externalId };
-    } catch (error) {
-      if (error instanceof ServiceTitanError && error.status === 404) {
-        // Wrong route shape for this tenant — try the next candidate.
-        lastError = error;
-        continue;
+  async function postBooking(body: STCreateBookingRequest): Promise<IntakeSubmissionResult> {
+    const candidates: Array<{ resource: string; body: STCreateBookingRequest }> = [
+      {
+        resource: `booking-provider/${config.bookingProviderId}/bookings`,
+        body
+      },
+      {
+        resource: 'bookings',
+        body: { ...body, bookingProviderId: config.bookingProviderId }
       }
-      throw error;
+    ];
+
+    let lastError: ServiceTitanError | null = null;
+    for (const candidate of candidates) {
+      try {
+        const created = await stRequest<STBookingResponse>(config, 'crm/v2', candidate.resource, {
+          method: 'POST',
+          body: candidate.body
+        });
+        return { bookingId: created.id, externalId };
+      } catch (error) {
+        if (error instanceof ServiceTitanError && error.status === 404) {
+          // Wrong route shape for this tenant — try the next candidate.
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
     }
+
+    throw lastError ??
+      new ServiceTitanError('No booking route candidate succeeded', {
+        status: 404,
+        title: 'No booking route matched'
+      });
   }
 
-  throw lastError ??
-    new ServiceTitanError('No booking route candidate succeeded', {
-      status: 404,
-      title: 'No booking route matched'
-    });
+  // `start` and contact memos are newer additions, not yet verified against
+  // every tenant's bookings endpoint. If ST rejects the payload, retry once
+  // without them — the same details are always in `summary`, and losing the
+  // lead over a prefill nicety is never acceptable.
+  const hasStructuredExtras = Boolean(start) || booking.contacts.some((c) => c.memo !== undefined);
+  try {
+    return await postBooking(booking);
+  } catch (error) {
+    if (!(error instanceof ServiceTitanError) || error.status !== 400 || !hasStructuredExtras) throw error;
+    console.warn(`[intake] bookings POST rejected structured start/contact fields (${error.message}); retrying without them`);
+    const fallback: STCreateBookingRequest = {
+      ...booking,
+      contacts: booking.contacts.filter((c) => c.memo === undefined)
+    };
+    delete fallback.start;
+    return await postBooking(fallback);
+  }
 }
