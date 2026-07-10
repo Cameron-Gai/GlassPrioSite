@@ -14,6 +14,8 @@ export interface BookingFeeContext {
   /** True when the OSC was collected (captured) online via Stripe. */
   paid: boolean;
   paymentIntentId: string | null;
+  /** Dollars actually collected online — base OSC + WA sales tax when quoted. */
+  paidTotal?: number | null;
   /** Diagnostic reason when the OSC was not collected online. */
   flag: string;
   /** Resolved ServiceTitan business-unit id for the ZIP + customer type (pre-fills the booking). */
@@ -167,7 +169,10 @@ function feeLine(feeCtx?: BookingFeeContext): string | null {
       return `On-site consultation charge: $${feeCtx.osc}${zone} - WAIVED, customer opted into a REMOTE consultation. Review the attached photos first; the charge applies only if/when a truck is rolled.`;
     }
     if (feeCtx.paid) {
-      return `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}).`;
+      const total = feeCtx.paidTotal ?? feeCtx.osc;
+      const tax = Math.round((total - feeCtx.osc) * 100) / 100;
+      const taxNote = tax > 0 ? ` incl. $${tax.toFixed(2)} sales tax` : '';
+      return `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}): $${total.toFixed(2)} collected${taxNote}. Do NOT collect again.`;
     }
     if (feeCtx.deferred) {
       return `On-site consultation charge: $${feeCtx.osc}${zone} - customer chose PAY LATER. On conversion to a job, the "OSC Collection" tag is applied and a Stripe payment link is texted to collect before the appointment.`;
@@ -191,6 +196,7 @@ function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): 
     if (feeCtx.paid && feeCtx.paymentIntentId) {
       data.push({ key: 'osc_paid', value: 'true' });
       data.push({ key: 'stripe_payment_intent', value: feeCtx.paymentIntentId });
+      if (feeCtx.paidTotal != null) data.push({ key: 'osc_paid_total', value: String(feeCtx.paidTotal) });
     }
     if (feeCtx.deferred) data.push({ key: 'osc_paylater', value: 'true' });
     if (feeCtx.remoteConsult) data.push({ key: 'osc_remote_consult', value: 'true' });

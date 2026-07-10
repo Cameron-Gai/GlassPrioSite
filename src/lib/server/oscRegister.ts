@@ -20,6 +20,13 @@ export interface DeferredOscRegistration {
   jobTypeName: string;
   customerName: string;
   phone: string;
+  /** Pay-now: the customer already paid at intake — GlassReports settles the job
+   *  on conversion (invoice alignment + Unapplied dashboard) instead of collecting. */
+  paid?: boolean;
+  /** Dollars actually captured (OSC + sales tax) for a paid registration. */
+  chargedAmount?: number | null;
+  /** Stripe PaymentIntent id for a paid registration. */
+  paymentRef?: string | null;
 }
 
 function baseUrl(): string | null {

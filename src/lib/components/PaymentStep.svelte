@@ -11,6 +11,7 @@
   type Phase = 'loading' | 'info' | 'card' | 'submitting';
   let phase: Phase = 'loading';
   let amount = 0;
+  let taxAmount = 0;
   let currency = 'usd';
   let zoneName: string | null = null;
   let infoText = '';
@@ -32,7 +33,8 @@
 
   const zip = state.address.zip.trim();
   const jobTypeName = state.selectedJobType?.name ?? '';
-  const money = (n: number) => `$${n.toLocaleString()}`;
+  const money = (n: number) =>
+    `$${n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
   function nonPaymentMessage(flag: string, amt: number): string {
     if (flag === 'unserviced-or-unknown') {
@@ -59,12 +61,15 @@
       const res = await fetch('/api/payment/intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ zip, jobTypeName })
+        // Street + city let the server quote sales tax for the exact address
+        // (ZIP-only falls back to the ZIP's default jurisdiction).
+        body: JSON.stringify({ zip, jobTypeName, street: state.address.street, city: state.address.city })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not load the fee');
 
       amount = Number(data.amount) || 0;
+      taxAmount = Number(data.taxAmount) || 0;
       currency = data.currency || 'usd';
       zoneName = data.zoneName ?? null;
       const flag = data.flag ?? 'none';
@@ -80,7 +85,9 @@
 
       intakeStore.setFeeQuote({
         serviced: data.serviced === true || data.paymentRequired === true,
-        osc: amount,
+        // The fee quote keeps the BASE on-site charge (zone map's number);
+        // `amount` shown to the customer is base + sales tax.
+        osc: Number(data.baseAmount) || amount,
         currency,
         zoneName,
         flag,
@@ -201,7 +208,7 @@
     {/if}
   {:else}
     <p class="amount-line">
-      Due now: <strong>{money(amount)}</strong>
+      Due now: <strong>{money(amount)}</strong>{#if taxAmount > 0}<span class="tax-note"> (includes {money(taxAmount)} sales tax)</span>{/if}
       {#if zoneName}<span class="muted"> · {zoneName}</span>{/if}
     </p>
     <p class="muted small">
@@ -280,6 +287,10 @@
   .amount-line {
     margin: 0;
     font-size: 1.05rem;
+  }
+  .tax-note {
+    font-size: 0.85em;
+    color: var(--ink-3, #6b7280);
   }
   .amount-line strong {
     font-size: 1.2rem;

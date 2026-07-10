@@ -2,6 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { resolveFee } from '$lib/server/zoneFee';
+import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { createAuthorization, getPublishableKey, isStripeConfigured, classifyStripeError, getStripeMode } from '$lib/server/payments/stripe';
 
 /** Operators flip PAYMENT_DEBUG=true (Railway var) to surface the precise failure
@@ -22,9 +23,9 @@ function paymentDebugEnabled(): boolean {
  * paymentRequired:false so the wizard skips the card step.
  */
 export const POST: RequestHandler = async ({ request }) => {
-  let body: { zip?: string; jobTypeName?: string };
+  let body: { zip?: string; jobTypeName?: string; street?: string; city?: string };
   try {
-    body = (await request.json()) as { zip?: string; jobTypeName?: string };
+    body = (await request.json()) as { zip?: string; jobTypeName?: string; street?: string; city?: string };
   } catch {
     throw error(400, 'Invalid JSON payload');
   }
@@ -37,6 +38,17 @@ export const POST: RequestHandler = async ({ request }) => {
   const fee = await resolveFee(zip, jobTypeName);
   const debug = paymentDebugEnabled();
 
+  if (!(fee.serviced && fee.osc > 0)) {
+    return json({ paymentRequired: false, amount: fee.osc, currency: fee.currency, serviced: fee.serviced, flag: fee.flag });
+  }
+
+  // Sales tax on the OSC, from WA DOR by service address (the same source
+  // ServiceTitan's tax zones sync from — the invoice will show this rate).
+  // Best-effort: a failed lookup charges the untaxed base rather than blocking.
+  const tax = await lookupWaSalesTax({ street: body.street, city: body.city, zip });
+  const taxAmount = taxAmountOn(fee.osc, tax);
+  const total = Math.round((fee.osc + taxAmount) * 100) / 100;
+
   // A charge-due response that, for whatever reason, can't be collected online.
   // We never block the lead: the customer still sees the amount and submits, and
   // the office collects at scheduling. `code`/`reason` ride along for operators
@@ -44,7 +56,9 @@ export const POST: RequestHandler = async ({ request }) => {
   const collectLater = (flag: string, code?: string, reason?: string) =>
     json({
       paymentRequired: false,
-      amount: fee.osc,
+      amount: total,
+      baseAmount: fee.osc,
+      taxAmount,
       currency: fee.currency,
       serviced: true,
       zoneName: fee.zoneName,
@@ -53,10 +67,6 @@ export const POST: RequestHandler = async ({ request }) => {
       ...(code ? { code } : {}),
       ...(debug ? { stripeMode: getStripeMode() ?? 'legacy', reason } : {}),
     });
-
-  if (!(fee.serviced && fee.osc > 0)) {
-    return json({ paymentRequired: false, amount: fee.osc, currency: fee.currency, serviced: fee.serviced, flag: fee.flag });
-  }
   if (!isStripeConfigured()) {
     // No (or malformed) Stripe secret key — online collection is off by design.
     return collectLater('payment-not-configured', 'stripe-not-configured', 'STRIPE_SECRET_KEY is unset or malformed on the server.');
@@ -71,16 +81,20 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   try {
-    const auth = await createAuthorization(fee.osc * 100, fee.currency, {
+    const auth = await createAuthorization(Math.round(total * 100), fee.currency, {
       zip,
       jobTypeName,
       zoneId: fee.zoneId ?? '',
       jobTypeId: fee.jobTypeId ?? '',
       osc: String(fee.osc),
+      taxAmount: String(taxAmount),
+      taxLocationCode: tax?.locationCode ?? '',
     });
     return json({
       paymentRequired: true,
-      amount: fee.osc,
+      amount: total,
+      baseAmount: fee.osc,
+      taxAmount,
       currency: fee.currency,
       zoneName: fee.zoneName,
       clientSecret: auth.clientSecret,

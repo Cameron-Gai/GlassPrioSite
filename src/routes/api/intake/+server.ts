@@ -12,6 +12,7 @@ import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
 import { resolveFee } from '$lib/server/zoneFee';
 import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
 import { captureIntent, cancelIntent, getIntent } from '$lib/server/payments/stripe';
+import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { registerDeferredOsc } from '$lib/server/oscRegister';
 
 function isNonEmptyString(value: unknown): value is string {
@@ -109,6 +110,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
   // didn't — online payment was unavailable/degraded at review — book anyway and
   // let the office collect the OSC at scheduling.
   let authorizedIntentId: string | null = null;
+  /** Dollars actually authorized (base OSC + sales tax when quoted). */
+  let authorizedTotal: number | null = null;
   const intentId = (payload.paymentIntentId ?? '').trim();
   if (feeDue && !remoteConsult && intentId) {
     let intent;
@@ -118,12 +121,19 @@ export const POST: RequestHandler = async ({ request, url }) => {
       console.error('[api/intake] could not retrieve payment intent', verifyError);
       return json({ success: false, error: 'We could not verify your payment. Please try again.' }, { status: 502 });
     }
-    const expectedCents = fee.osc * 100;
-    if (intent.status !== 'requires_capture' || intent.amount !== expectedCents || intent.currency !== fee.currency) {
+    // The intent was created for base OSC + WA sales tax (same DOR lookup, cached
+    // so both calls see the same rate). Accept the tax-inclusive total, or the
+    // bare base for intents created while the tax lookup was degraded.
+    const tax = await lookupWaSalesTax({ street: payload.address.street, city: payload.address.city, zip: payload.address.zip });
+    const expectedTotalCents = Math.round((fee.osc + taxAmountOn(fee.osc, tax)) * 100);
+    const baseCents = Math.round(fee.osc * 100);
+    const amountOk = intent.amount === expectedTotalCents || intent.amount === baseCents;
+    if (intent.status !== 'requires_capture' || !amountOk || intent.currency !== fee.currency) {
       console.warn('[api/intake] payment intent mismatch', {
         status: intent.status,
         amount: intent.amount,
-        expectedCents,
+        expectedTotalCents,
+        baseCents,
         currency: intent.currency
       });
       return json(
@@ -132,6 +142,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       );
     }
     authorizedIntentId = intentId;
+    authorizedTotal = intent.amount / 100;
   } else if (feeDue && remoteConsult) {
     // OSC waived for a remote consultation — book unpaid; the charge only applies
     // if/when a truck is rolled after the virtual review.
@@ -156,6 +167,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     zoneName: fee.zoneName,
     paid: authorizedIntentId !== null,
     paymentIntentId: authorizedIntentId,
+    paidTotal: authorizedTotal,
     flag: fee.flag,
     businessUnitId,
     deferred,
@@ -215,9 +227,11 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }
 
   // Booking succeeded — capture the authorized charge.
+  let captured = false;
   if (authorizedIntentId) {
     try {
       await captureIntent(authorizedIntentId);
+      captured = true;
     } catch (captureError) {
       // Rare: booking exists but capture failed. Don't fail the customer — the
       // office can collect at scheduling; log loudly for follow-up.
@@ -227,6 +241,26 @@ export const POST: RequestHandler = async ({ request, url }) => {
         captureError
       });
     }
+  }
+
+  // Pay now: register the CAPTURED payment with GlassReports so its reconciler
+  // links the eventual ServiceTitan job, aligns the invoice, and surfaces the
+  // money on the Unapplied Stripe payments dashboard. Best-effort.
+  if (captured && booked) {
+    await registerDeferredOsc({
+      externalId: booked.externalId,
+      bookingId: booked.bookingId,
+      amount: fee.osc,
+      currency: fee.currency,
+      zip: payload.address.zip,
+      jobTypeId: fee.jobTypeId,
+      jobTypeName: payload.selectedJobType.name,
+      customerName: `${payload.customer.firstName} ${payload.customer.lastName}`.trim(),
+      phone: payload.customer.phone,
+      paid: true,
+      chargedAmount: authorizedTotal,
+      paymentRef: authorizedIntentId
+    });
   }
 
   // Pay later: hand the deferred OSC to GlassReports so it texts the Stripe link
@@ -251,7 +285,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     confirmationNumber: confirmation.confirmationNumber,
     ...confirmation.extra,
     ...(authorizedIntentId
-      ? { paid: { amount: fee.osc, currency: fee.currency, paymentIntentId: authorizedIntentId } }
+      ? { paid: { amount: authorizedTotal ?? fee.osc, currency: fee.currency, paymentIntentId: authorizedIntentId } }
       : {})
   });
 };
