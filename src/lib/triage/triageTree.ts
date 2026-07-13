@@ -279,17 +279,19 @@ export const triageTree: Record<string, TriageNode> = {
       {
         id: 'patio-only',
         label: 'Patio door',
-        routeJobTypeName: 'Patio and Pet Door - Consultation'
+        routeJobTypeName: 'Patio Door - Consultation'
       },
       {
         id: 'pet-only',
         label: 'Pet door',
-        routeJobTypeName: 'Patio and Pet Door - Consultation'
+        routeJobTypeName: 'Pet Door - Consultation'
       },
       {
+        // Both in one visit: book under the patio door (the larger job) — the
+        // consult covers the pet door too; details carry it for the CSR.
         id: 'patio-pet-both',
         label: 'Both',
-        routeJobTypeName: 'Patio and Pet Door - Consultation'
+        routeJobTypeName: 'Patio Door - Consultation'
       }
     ]
   },

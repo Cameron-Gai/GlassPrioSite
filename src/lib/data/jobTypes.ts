@@ -330,20 +330,41 @@ export const jobTypes: JobType[] = [
     consultationFormat: 'none'
   },
   {
-    name: 'Patio and Pet Door - Consultation',
+    name: 'Patio Door - Consultation',
     priority: 'High',
     duration: '30 minutes',
     category: 'patio-pet-door',
     customerFacing: true,
     publicIntakeEnabled: true,
-    customerLabel: 'Patio or Pet Door — Consultation',
-    summary: 'On-site assessment and quote for patio or pet door installation or repair.',
+    customerLabel: 'Patio Door — Consultation',
+    summary: 'On-site assessment and quote for patio door installation or repair.',
     includes: ['On-site assessment', 'Measurements', 'Written quote'],
     pricing: { display: 'Quoted on-site' },
     consultationFormat: 'on-site'
   },
   {
-    name: 'Patio and Pet Door - Installation',
+    name: 'Patio Door - Installation',
+    priority: 'High',
+    duration: '4 hours',
+    category: 'patio-pet-door',
+    customerFacing: false,
+    publicIntakeEnabled: false
+  },
+  {
+    name: 'Pet Door - Consultation',
+    priority: 'High',
+    duration: '30 minutes',
+    category: 'patio-pet-door',
+    customerFacing: true,
+    publicIntakeEnabled: true,
+    customerLabel: 'Pet Door — Consultation',
+    summary: 'On-site assessment and quote for pet door installation or repair.',
+    includes: ['On-site assessment', 'Measurements', 'Written quote'],
+    pricing: { display: 'Quoted on-site' },
+    consultationFormat: 'on-site'
+  },
+  {
+    name: 'Pet Door - Installation',
     priority: 'High',
     duration: '4 hours',
     category: 'patio-pet-door',
