@@ -62,8 +62,16 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Street + city let the server quote sales tax for the exact address
-        // (ZIP-only falls back to the ZIP's default jurisdiction).
-        body: JSON.stringify({ zip, jobTypeName, street: state.address.street, city: state.address.city })
+        // (ZIP-only falls back to the ZIP's default jurisdiction); email + name
+        // let Stripe group the payment under a Customer and send a receipt.
+        body: JSON.stringify({
+          zip,
+          jobTypeName,
+          street: state.address.street,
+          city: state.address.city,
+          email: state.customer.email,
+          name: `${state.customer.firstName} ${state.customer.lastName}`.trim()
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not load the fee');

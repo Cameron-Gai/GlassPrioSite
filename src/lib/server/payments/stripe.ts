@@ -143,6 +143,7 @@ export async function createAuthorization(
   amountCents: number,
   currency: string,
   metadata: Record<string, string>,
+  opts?: { customerId?: string | null; receiptEmail?: string | null },
 ): Promise<AuthorizationResult> {
   const stripe = getStripe();
   if (!stripe) throw new Error('Stripe is not configured');
@@ -156,9 +157,50 @@ export async function createAuthorization(
     automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
     description: 'Glass Doctor on-site consultation charge',
     metadata,
+    // Grouping + receipts: customer requires the Customers permission on the
+    // key (best-effort upstream); receipt_email makes Stripe email a receipt
+    // when the hold is captured at booking.
+    ...(opts?.customerId ? { customer: opts.customerId } : {}),
+    ...(opts?.receiptEmail?.trim() ? { receipt_email: opts.receiptEmail.trim() } : {}),
   });
   if (!intent.client_secret) throw new Error('Stripe did not return a client secret');
   return { id: intent.id, clientSecret: intent.client_secret, amount: intent.amount, currency: intent.currency };
+}
+
+/**
+ * Merge booking references onto a PaymentIntent's metadata (Stripe merges keys,
+ * it doesn't replace the map) — done right after the ServiceTitan booking is
+ * created so every Stripe payment links back to its booking from the dashboard.
+ */
+export async function updateIntentMetadata(id: string, metadata: Record<string, string>): Promise<void> {
+  const stripe = getStripe();
+  if (!stripe) throw new Error('Stripe is not configured');
+  await stripe.paymentIntents.update(id, { metadata });
+}
+
+/**
+ * Find (by exact email) or create a Stripe Customer so intake payments group
+ * per customer in the dashboard. STRICTLY best-effort: the restricted keys lack
+ * the Customers permission as of 2026-07-16 (probed) — returns null until
+ * "Customers: Read + Write" is granted, and the intent is simply created
+ * without a customer in the meantime.
+ */
+export async function findOrCreateCustomer(email: string | null | undefined, name?: string | null): Promise<string | null> {
+  const trimmed = email?.trim();
+  if (!trimmed) return null;
+  const stripe = getStripe();
+  if (!stripe) return null;
+  try {
+    const existing = await stripe.customers.list({ email: trimmed, limit: 1 });
+    if (existing.data[0]) return existing.data[0].id;
+    const created = await stripe.customers.create({
+      email: trimmed,
+      ...(name?.trim() ? { name: name.trim() } : {}),
+    });
+    return created.id;
+  } catch {
+    return null; // missing permission or transient failure — proceed without
+  }
 }
 
 export async function getIntent(id: string): Promise<Stripe.PaymentIntent> {

@@ -11,7 +11,7 @@ import {
 import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
 import { resolveFee } from '$lib/server/zoneFee';
 import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
-import { captureIntent, cancelIntent, getIntent } from '$lib/server/payments/stripe';
+import { captureIntent, cancelIntent, getIntent, updateIntentMetadata } from '$lib/server/payments/stripe';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { registerDeferredOsc } from '$lib/server/oscRegister';
 
@@ -226,7 +226,23 @@ export const POST: RequestHandler = async ({ request, url }) => {
     throw error(500, 'Internal error submitting intake');
   }
 
-  // Booking succeeded — capture the authorized charge.
+  // Booking succeeded — stamp the PaymentIntent with its booking references
+  // BEFORE capture, so the Stripe payment links back to the ServiceTitan
+  // booking from the dashboard and the reconciliation sweep can heal a failed
+  // registration. Best-effort: a stamp failure never blocks the capture.
+  if (authorizedIntentId && booked) {
+    try {
+      await updateIntentMetadata(authorizedIntentId, {
+        externalId: booked.externalId,
+        bookingId: String(booked.bookingId),
+        confirmationNumber: String(confirmation.confirmationNumber ?? ''),
+      });
+    } catch (stampError) {
+      console.warn('[api/intake] could not stamp payment intent with booking refs', stampError);
+    }
+  }
+
+  // Capture the authorized charge.
   let captured = false;
   if (authorizedIntentId) {
     try {

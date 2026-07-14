@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { resolveFee } from '$lib/server/zoneFee';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
-import { createAuthorization, getPublishableKey, isStripeConfigured, classifyStripeError, getStripeMode } from '$lib/server/payments/stripe';
+import { createAuthorization, findOrCreateCustomer, getPublishableKey, isStripeConfigured, classifyStripeError, getStripeMode } from '$lib/server/payments/stripe';
 
 /** Operators flip PAYMENT_DEBUG=true (Railway var) to surface the precise failure
  *  reason in the API response + intake UI while diagnosing; off for customers. */
@@ -23,9 +23,9 @@ function paymentDebugEnabled(): boolean {
  * paymentRequired:false so the wizard skips the card step.
  */
 export const POST: RequestHandler = async ({ request }) => {
-  let body: { zip?: string; jobTypeName?: string; street?: string; city?: string };
+  let body: { zip?: string; jobTypeName?: string; street?: string; city?: string; email?: string; name?: string };
   try {
-    body = (await request.json()) as { zip?: string; jobTypeName?: string; street?: string; city?: string };
+    body = (await request.json()) as { zip?: string; jobTypeName?: string; street?: string; city?: string; email?: string; name?: string };
   } catch {
     throw error(400, 'Invalid JSON payload');
   }
@@ -81,15 +81,28 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   try {
-    const auth = await createAuthorization(Math.round(total * 100), fee.currency, {
-      zip,
-      jobTypeName,
-      zoneId: fee.zoneId ?? '',
-      jobTypeId: fee.jobTypeId ?? '',
-      osc: String(fee.osc),
-      taxAmount: String(taxAmount),
-      taxLocationCode: tax?.locationCode ?? '',
-    });
+    const customerEmail = (body.email ?? '').trim() || null;
+    const customerName = (body.name ?? '').trim() || null;
+    // Group payments per customer in Stripe when the key permits (best-effort).
+    const customerId = await findOrCreateCustomer(customerEmail, customerName);
+    const auth = await createAuthorization(
+      Math.round(total * 100),
+      fee.currency,
+      {
+        // `kind` is the reconciliation sweep's marker; booking refs are stamped
+        // on after the ServiceTitan booking is created.
+        kind: 'osc_intake_paynow',
+        zip,
+        jobTypeName,
+        zoneId: fee.zoneId ?? '',
+        jobTypeId: fee.jobTypeId ?? '',
+        osc: String(fee.osc),
+        taxAmount: String(taxAmount),
+        taxLocationCode: tax?.locationCode ?? '',
+        ...(customerName ? { customerName } : {}),
+      },
+      { customerId, receiptEmail: customerEmail },
+    );
     return json({
       paymentRequired: true,
       amount: total,
