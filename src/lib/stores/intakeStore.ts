@@ -70,6 +70,9 @@ export interface IntakeState {
   schedulingPreference: SchedulingPreference;
   /** Resolved at the review step; null while not yet loaded. */
   feeQuote: FeeQuoteClient | null;
+  /** Early, non-authoritative quote from the address step's ZIP check —
+   *  feeds the summary rail; review re-resolves authoritatively. */
+  advisoryQuote: { serviced: boolean; osc: number; zoneName: string | null; flag: string } | null;
   /** Stripe PaymentIntent id once the card hold is authorized. */
   paymentIntentId: string | null;
   paymentAuthorized: boolean;
@@ -175,7 +178,8 @@ function initialState(): IntakeState {
     isDuringBusinessHours: false,
     priorityUpgrade: false,
     customer: { firstName: '', lastName: '', phone: '', email: '' },
-    address: { street: '', city: '', state: '', zip: '' },
+    // State prefills to WA — virtually every customer is local (editable).
+    address: { street: '', city: '', state: 'WA', zip: '' },
     propertyType: '',
     propertyDetails: { businessName: '', complexName: '', role: '' },
     onSiteContact: { differs: false, name: '', phone: '' },
@@ -206,6 +210,7 @@ function initialState(): IntakeState {
     },
     schedulingPreference: '',
     feeQuote: null,
+    advisoryQuote: null,
     paymentIntentId: null,
     paymentAuthorized: false,
     payLater: false,
@@ -273,6 +278,7 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
     specialInstructions: { ...base.specialInstructions, ...saved.specialInstructions },
     // Time-sensitive / transient — never trust these across a reload.
     feeQuote: null,
+    advisoryQuote: null,
     paymentIntentId: null,
     paymentAuthorized: false,
     payLater: false,
@@ -329,12 +335,18 @@ function createIntakeStore() {
   }
 
   /** Called once from the wizard's onMount (browser only): restore a saved draft,
-   *  then enable ongoing persistence. */
-  function hydrate() {
-    if (!browser || persistEnabled) return;
-    const saved = readPersisted();
-    if (saved) store.set(sanitizeForHydrate(saved));
+   *  then enable ongoing persistence. Returns true when a mid-flow draft was
+   *  actually restored (so the wizard can say so and offer "start over"). */
+  function hydrate(): boolean {
+    if (!browser || persistEnabled) return false;
     persistEnabled = true;
+    const saved = readPersisted();
+    if (!saved) return false;
+    const merged = sanitizeForHydrate(saved);
+    store.set(merged);
+    // "Restored" only counts when they'd made real progress — a pristine
+    // triage screen needs no banner.
+    return merged.step !== 'triage' || merged.triageHistory.length > 0;
   }
 
   function selectOption(option: TriageOption) {
@@ -637,6 +649,7 @@ function createIntakeStore() {
       ...state,
       address: { ...state.address, ...patch },
       feeQuote: null,
+      advisoryQuote: 'zip' in patch ? null : state.advisoryQuote,
       paymentIntentId: null,
       paymentAuthorized: false,
       payLater: false,
@@ -650,6 +663,11 @@ function createIntakeStore() {
 
   function setFeeQuote(quote: FeeQuoteClient) {
     store.update((state) => ({ ...state, feeQuote: quote }));
+  }
+
+  /** Advisory quote from the address-step ZIP check (summary-rail display only). */
+  function setAdvisoryQuote(quote: IntakeState['advisoryQuote']) {
+    store.update((state) => ({ ...state, advisoryQuote: quote }));
   }
 
   function setPaymentAuthorized(paymentIntentId: string) {
@@ -913,6 +931,7 @@ function createIntakeStore() {
     applyReturningCustomer,
     dismissReturningCustomer,
     setFeeQuote,
+    setAdvisoryQuote,
     setPaymentAuthorized,
     setPayLater,
     setPayLaterInfo,

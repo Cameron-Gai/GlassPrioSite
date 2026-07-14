@@ -3,29 +3,13 @@
   import PaymentStep from './PaymentStep.svelte';
   import PhotoUploadMock from './PhotoUploadMock.svelte';
   import { intakeStore, type IntakeState, type WizardStep } from '$lib/stores/intakeStore';
+  import { describeTiming } from '$lib/utils/timing';
 
   export let state: IntakeState;
 
   /** Jump to a step to fix something; the wizard brings them straight back here. */
   function edit(step: WizardStep) {
     intakeStore.beginEdit(step);
-  }
-
-  /** Human-readable requested timing: a picked date, 'flexible', or priority/emergency. */
-  function timingLabel(s: IntakeState): string {
-    if (s.priorityUpgrade) return 'Priority Service — within 2 hours';
-    if (s.isEmergency) return 'Emergency — immediate dispatch';
-    const pref = s.schedulingPreference;
-    if (!pref) return '—';
-    if (pref === 'flexible') return 'Flexible — first available';
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(pref);
-    if (m) {
-      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-      const day = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      const window = s.specialInstructions.preferredWindow;
-      return window ? `${day} · ${window}` : day;
-    }
-    return pref;
   }
 </script>
 
@@ -160,7 +144,7 @@
         <button type="button" class="edit" on:click={() => edit('scheduling')}>Edit</button>
       {/if}
     </h3>
-    <p>{timingLabel(state)}</p>
+    <p>{describeTiming(state)}</p>
     {#if !state.isEmergency && !state.priorityUpgrade}
       <p class="muted small">
         This is a request — our team will confirm, and we'll contact you if it doesn't work out.

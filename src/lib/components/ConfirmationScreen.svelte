@@ -10,6 +10,21 @@
   const money = (n: number) => `$${n.toLocaleString()}`;
   $: charge = state.feeQuote && state.feeQuote.osc > 0 ? state.feeQuote : null;
 
+  let copied = false;
+  let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function copyConfirmation() {
+    if (!state.confirmationNumber) return;
+    try {
+      await navigator.clipboard.writeText(state.confirmationNumber);
+      copied = true;
+      if (copyTimer) clearTimeout(copyTimer);
+      copyTimer = setTimeout(() => (copied = false), 2000);
+    } catch {
+      // Clipboard unavailable (permissions/http) — the number is visible anyway.
+    }
+  }
+
   $: nextSteps = buildNextSteps(state);
 
   function buildNextSteps(s: IntakeState): string[] {
@@ -60,13 +75,18 @@
   <div class="hero">
     <span class="check" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 12.5l4.5 4.5L19 7" />
+        <path class="check-path" d="M5 12.5l4.5 4.5L19 7" />
       </svg>
     </span>
     <h2>Request received</h2>
     <p class="sub">
       Confirmation number
       <strong>{state.confirmationNumber ?? '—'}</strong>
+      {#if state.confirmationNumber}
+        <button type="button" class="copy" on:click={copyConfirmation}>
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
+      {/if}
     </p>
   </div>
 
@@ -147,6 +167,42 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  /* The checkmark draws itself in — a small moment of earned delight. */
+  @media (prefers-reduced-motion: no-preference) {
+    .check-path {
+      stroke-dasharray: 24;
+      stroke-dashoffset: 24;
+      animation: check-draw 0.45s 0.15s ease-out forwards;
+    }
+  }
+
+  @keyframes check-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .copy {
+    margin-left: 0.45rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  }
+
+  .copy:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  .copy:active {
+    transform: scale(0.95);
   }
 
   h2 {

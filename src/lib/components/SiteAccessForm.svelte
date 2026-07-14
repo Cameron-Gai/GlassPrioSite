@@ -1,5 +1,6 @@
 <script lang="ts">
   import { intakeStore } from '$lib/stores/intakeStore';
+  import { formatUsPhoneInput } from '$lib/utils/phone';
   import PhotoUploadMock from './PhotoUploadMock.svelte';
   import type { SpecialInstructions, UploadedPhoto } from '$lib/types/intake';
 
@@ -93,9 +94,13 @@
             id="onSitePhone"
             type="tel"
             autocomplete="off"
-            placeholder="(555) 555-5555"
+            placeholder="(206) 555-5555"
             value={onSite.phone}
-            on:input={(event) => intakeStore.updateOnSiteContact({ phone: event.currentTarget.value })}
+            on:input={(event) => {
+              const formatted = formatUsPhoneInput(onSite.phone, event.currentTarget.value);
+              event.currentTarget.value = formatted;
+              intakeStore.updateOnSiteContact({ phone: formatted });
+            }}
           />
         </div>
       </div>

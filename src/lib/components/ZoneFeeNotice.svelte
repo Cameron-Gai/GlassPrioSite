@@ -6,6 +6,8 @@
    * earlier than before. Advisory only — the review step re-resolves the fee
    * authoritatively before any payment.
    */
+  import { intakeStore } from '$lib/stores/intakeStore';
+
   export let zip: string;
   export let jobTypeName: string;
 
@@ -65,6 +67,8 @@
         flag: data.flag ?? 'none'
       };
       status = 'done';
+      // Share with the summary rail (display-only; review re-resolves).
+      intakeStore.setAdvisoryQuote(quote);
     } catch {
       // Quiet failure — the review step re-resolves the fee authoritatively, so
       // showing nothing beats showing a scary error while they type an address.

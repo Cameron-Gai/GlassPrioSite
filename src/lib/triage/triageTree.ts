@@ -30,6 +30,8 @@ export interface TriageOption {
   routeJobTypeName?: string;
   systemAction?: SystemAction;
   isEmergency?: boolean;
+  /** Visual emphasis; 'emergency' renders red and spans the full card row. */
+  tone?: 'emergency';
 }
 
 export type LayoutHint = 'list' | 'cards' | 'yesno';
@@ -42,31 +44,10 @@ export interface TriageNode {
   options: TriageOption[];
 }
 
+// The old standalone "Is this an emergency?" yes/no gate was merged into the
+// service grid (2026-07-14): the red emergency tile below is one tap for the
+// urgent minority, and the non-urgent majority saves a whole screen.
 export const triageTree: Record<string, TriageNode> = {
-  emergency: {
-    id: 'emergency',
-    question: 'Is this an emergency or safety issue?',
-    helperText:
-      "Examples: broken glass, an unsecured door or window, weather entering the building, an unusable business entrance. If any of those apply, we'll route you to fast-response service.",
-    layout: 'yesno',
-    options: [
-      {
-        id: 'emergency-yes',
-        label: 'Yes — it’s urgent',
-        helperText: 'We’ll dispatch a same-day priority response',
-        icon: 'yes',
-        nextNodeId: 'emergency-which'
-      },
-      {
-        id: 'emergency-no',
-        label: 'No — not urgent',
-        helperText: 'Continue to the normal service request',
-        icon: 'no',
-        nextNodeId: 'service-category'
-      }
-    ]
-  },
-
   'emergency-which': {
     id: 'emergency-which',
     question: 'Which best describes the emergency?',
@@ -110,6 +91,14 @@ export const triageTree: Record<string, TriageNode> = {
     helperText: "Pick the closest match — we'll fine-tune the details next.",
     layout: 'cards',
     options: [
+      {
+        id: 'cat-emergency',
+        label: 'This is an emergency',
+        helperText: 'Broken glass, unsecured door or window, weather coming in — same-day dispatch',
+        icon: 'emergency-glass',
+        tone: 'emergency',
+        nextNodeId: 'emergency-which'
+      },
       {
         id: 'cat-glass',
         label: 'Glass replacement',
@@ -370,7 +359,7 @@ export const triageTree: Record<string, TriageNode> = {
   }
 };
 
-export const TRIAGE_ROOT_ID = 'emergency';
+export const TRIAGE_ROOT_ID = 'service-category';
 
 export interface TriageRoute {
   jobType: JobType;

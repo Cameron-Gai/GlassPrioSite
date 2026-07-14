@@ -50,13 +50,16 @@
   {:else if node.layout === 'cards'}
     <div class="grid">
       {#each node.options as option (option.id)}
-        <OptionCard
-          label={option.label}
-          helperText={option.helperText}
-          icon={option.icon}
-          selected={flashId === option.id}
-          on:click={() => pick(option)}
-        />
+        <div class="cell" class:wide={option.tone === 'emergency'}>
+          <OptionCard
+            label={option.label}
+            helperText={option.helperText}
+            icon={option.icon}
+            tone={option.tone ?? 'default'}
+            selected={flashId === option.id}
+            on:click={() => pick(option)}
+          />
+        </div>
       {/each}
     </div>
   {:else}
@@ -111,6 +114,15 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
+  }
+
+  .cell {
+    display: grid;
+    min-width: 0;
+  }
+
+  .cell.wide {
+    grid-column: 1 / -1;
   }
 
   @media (max-width: 720px) {

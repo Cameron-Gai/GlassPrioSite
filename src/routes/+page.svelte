@@ -1,5 +1,6 @@
 <script lang="ts">
   import IntakeWizard from '$lib/components/IntakeWizard.svelte';
+  import SummaryRail from '$lib/components/SummaryRail.svelte';
   import { describeBusinessHours, isBusinessHours } from '$lib/utils/businessHours';
 
   const hoursDescription = describeBusinessHours();
@@ -71,9 +72,14 @@
       </ul>
     </section>
 
-    <section class="panel">
-      <IntakeWizard />
-    </section>
+    <div class="content">
+      <section class="panel">
+        <IntakeWizard />
+      </section>
+      <div class="rail-slot">
+        <SummaryRail />
+      </div>
+    </div>
 
     <footer class="foot">
       <p>Business hours: {hoursDescription}</p>
@@ -267,6 +273,31 @@
     margin: 0 auto;
     padding: 1rem 1.2rem 3rem;
     flex: 1;
+  }
+
+  /* Desktop: the live summary rail rides alongside the form; below 1100px the
+     rail disappears and the layout is the single centered column. */
+  .rail-slot {
+    display: none;
+  }
+
+  @media (min-width: 1100px) {
+    main {
+      max-width: 1040px;
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 1.4rem;
+      align-items: start;
+    }
+
+    .rail-slot {
+      display: block;
+      position: sticky;
+      top: 84px; /* clears the sticky topbar */
+    }
   }
 
   .hero {

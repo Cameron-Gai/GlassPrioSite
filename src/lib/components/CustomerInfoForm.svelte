@@ -1,5 +1,6 @@
 <script lang="ts">
   import { intakeStore } from '$lib/stores/intakeStore';
+  import { formatUsPhoneInput } from '$lib/utils/phone';
   import type { CustomerInfo } from '$lib/types/intake';
 
   export let value: CustomerInfo;
@@ -7,6 +8,12 @@
 
   function update<K extends keyof CustomerInfo>(field: K, raw: string) {
     intakeStore.updateCustomer({ [field]: raw } as Partial<CustomerInfo>);
+  }
+
+  function updatePhone(event: Event & { currentTarget: HTMLInputElement }) {
+    const formatted = formatUsPhoneInput(value.phone, event.currentTarget.value);
+    event.currentTarget.value = formatted;
+    update('phone', formatted);
   }
 
   $: errors = {
@@ -52,9 +59,9 @@
       type="tel"
       inputmode="tel"
       autocomplete="tel"
-      placeholder="(555) 555-1234"
+      placeholder="(206) 555-1234"
       value={value.phone}
-      on:input={(event) => update('phone', event.currentTarget.value)}
+      on:input={updatePhone}
     />
     {#if showErrors && errors.phone}<p class="error">Enter a valid phone number</p>{/if}
   </div>

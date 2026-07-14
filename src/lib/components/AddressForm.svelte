@@ -63,6 +63,7 @@
       inputmode="numeric"
       autocomplete="postal-code"
       placeholder="98101"
+      maxlength="10"
       value={value.zip}
       on:input={(event) => update('zip', event.currentTarget.value)}
     />

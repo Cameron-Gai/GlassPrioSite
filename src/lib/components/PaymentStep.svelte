@@ -4,6 +4,7 @@
   import type { Stripe, StripeElements } from '@stripe/stripe-js';
   import { intakeStore } from '$lib/stores/intakeStore';
   import type { IntakeState } from '$lib/stores/intakeStore';
+  import { formatUsPhoneInput } from '$lib/utils/phone';
   import PhotoUploadMock from './PhotoUploadMock.svelte';
 
   export let state: IntakeState;
@@ -16,24 +17,27 @@
   let zoneName: string | null = null;
   let infoText = '';
   let payError = '';
-  /** Remote-consultation opt-in: waive the on-site charge, require a photo. */
-  let showRemote = false;
+  /** The three peer ways to handle the charge: card now, texted link later,
+   *  or a remote consultation that waives the visit charge entirely. */
+  type PayChoice = 'now' | 'later' | 'remote';
+  let payChoice: PayChoice = 'now';
   let remoteError = '';
-  /** Pay-later panel: needs an explicit texting consent (the text IS the
-   *  collection channel) and lets the customer point the link at a different
-   *  number than their contact phone. */
-  let showPayLater = false;
+  /** Pay-later needs an explicit texting consent (the text IS the collection
+   *  channel) and lets the customer point the link at a different number. */
   let payPhone = '';
   let payConsent = false;
   let payLaterError = '';
   const PHONE_OK = /^[0-9+\-\s().]{7,}$/;
 
-  function togglePayLater() {
-    showPayLater = !showPayLater;
-    if (showPayLater && !payPhone.trim()) {
-      // Autofill from the contact phone; the customer can overwrite it.
-      payPhone = state.payLaterPhone || state.customer.phone;
-    }
+  // Autofill the pay-by-text number from the contact phone on first open.
+  $: if (payChoice === 'later' && !payPhone.trim()) {
+    payPhone = state.payLaterPhone || state.customer.phone;
+  }
+
+  function onPayPhoneInput(event: Event & { currentTarget: HTMLInputElement }) {
+    const formatted = formatUsPhoneInput(payPhone, event.currentTarget.value);
+    event.currentTarget.value = formatted;
+    payPhone = formatted;
   }
   /** Operator-facing diagnostic. Only rendered when the server reports
    *  debug mode (PAYMENT_DEBUG=true), so customers never see internals. */
@@ -244,34 +248,68 @@
     {/if}
   {:else}
     <p class="amount-line">
-      Due now: <strong>{money(amount)}</strong>{#if taxAmount > 0}<span class="tax-note"> (includes {money(taxAmount)} sales tax)</span>{/if}
+      On-site charge: <strong>{money(amount)}</strong>{#if taxAmount > 0}<span class="tax-note"> (includes {money(taxAmount)} sales tax)</span>{/if}
       {#if zoneName}<span class="muted"> · {zoneName}</span>{/if}
     </p>
-    <p class="muted small">
-      We authorize a {money(amount)} hold on your card now; it's charged when your request is submitted.
-      If we can't book your request, the hold is released.
-    </p>
 
-    <div class="card-field" bind:this={cardNode}></div>
-
-    {#if payError}<p class="pay-error">{payError}</p>{/if}
-
-    <button type="button" class="primary pay-btn" on:click={payAndSubmit} disabled={phase === 'submitting'}>
-      {phase === 'submitting' ? 'Processing…' : `Pay ${money(amount)} & submit request`}
-    </button>
-
-    <div class="later-row">
+    <!-- The three ways to handle the charge, presented as peers — the remote
+         option is a real choice, not fine print. -->
+    <div class="choices" role="radiogroup" aria-label="How would you like to handle the charge?">
       <button
         type="button"
-        class="later-btn"
-        aria-expanded={showPayLater}
-        on:click={togglePayLater}
+        role="radio"
+        aria-checked={payChoice === 'now'}
+        class="choice"
+        class:active={payChoice === 'now'}
+        on:click={() => (payChoice = 'now')}
         disabled={phase === 'submitting'}
       >
-        Pay later — text me the link
+        <span class="choice-title">Pay now</span>
+        <span class="choice-sub">Done in 30 seconds — nothing to chase later.</span>
       </button>
-      {#if showPayLater}
-        <p class="muted small later-note">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={payChoice === 'later'}
+        class="choice"
+        class:active={payChoice === 'later'}
+        on:click={() => (payChoice = 'later')}
+        disabled={phase === 'submitting'}
+      >
+        <span class="choice-title">Text me a payment link</span>
+        <span class="choice-sub">A secure link arrives once your appointment is scheduled.</span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={payChoice === 'remote'}
+        class="choice"
+        class:active={payChoice === 'remote'}
+        on:click={() => (payChoice = 'remote')}
+        disabled={phase === 'submitting'}
+      >
+        <span class="choice-title">Remote consultation first</span>
+        <span class="choice-sub">No charge unless we send a technician on-site. Needs a photo.</span>
+      </button>
+    </div>
+
+    <!-- Pay now: stays in the DOM even when hidden — the Stripe element is
+         mounted here and must not be destroyed by switching options. -->
+    <div class="panel" class:hidden={payChoice !== 'now'}>
+      <p class="muted small">
+        We authorize a {money(amount)} hold on your card now; it's charged when your request is
+        submitted. If we can't book your request, the hold is released.
+      </p>
+      <div class="card-field" bind:this={cardNode}></div>
+      {#if payError && payChoice === 'now'}<p class="pay-error">{payError}</p>{/if}
+      <button type="button" class="primary pay-btn" on:click={payAndSubmit} disabled={phase === 'submitting'}>
+        {phase === 'submitting' ? 'Processing…' : `Pay ${money(amount)} & submit request`}
+      </button>
+    </div>
+
+    {#if payChoice === 'later'}
+      <div class="panel">
+        <p class="muted small">
           We'll submit your request now and text a secure payment link once your appointment is
           scheduled. The {money(amount)} is collected before we arrive.
         </p>
@@ -283,7 +321,8 @@
             inputmode="tel"
             autocomplete="tel"
             placeholder="(206) 555-1234"
-            bind:value={payPhone}
+            value={payPhone}
+            on:input={onPayPhoneInput}
             disabled={phase === 'submitting'}
           />
         </div>
@@ -296,44 +335,37 @@
           </span>
         </label>
         {#if payLaterError}<p class="pay-error">{payLaterError}</p>{/if}
+        {#if payError}<p class="pay-error">{payError}</p>{/if}
         <button
           type="button"
-          class="remote-submit"
+          class="panel-submit"
           on:click={payLaterAndSubmit}
           disabled={phase === 'submitting' || !payConsent}
         >
-          Submit request — text me the payment link
+          {phase === 'submitting' ? 'Submitting…' : 'Submit request — text me the payment link'}
         </button>
-      {/if}
-    </div>
+      </div>
+    {/if}
 
-    <div class="remote-row">
-      <button
-        type="button"
-        class="later-btn"
-        aria-expanded={showRemote}
-        on:click={() => (showRemote = !showRemote)}
-        disabled={phase === 'submitting'}
-      >
-        Prefer a remote consultation? Skip the {money(amount)} visit charge
-      </button>
-      {#if showRemote}
-        <p class="muted small later-note">
+    {#if payChoice === 'remote'}
+      <div class="panel">
+        <p class="muted small">
           We'll review your photos first and only charge the {money(amount)} if we need to send a
           technician on-site. At least one photo is required.
         </p>
         <PhotoUploadMock photos={state.issueDetails.photos} />
         {#if remoteError}<p class="pay-error">{remoteError}</p>{/if}
+        {#if payError}<p class="pay-error">{payError}</p>{/if}
         <button
           type="button"
-          class="remote-submit"
+          class="panel-submit"
           on:click={remoteAndSubmit}
           disabled={phase === 'submitting'}
         >
-          Submit for remote consultation — no charge now
+          {phase === 'submitting' ? 'Submitting…' : 'Submit for remote consultation — no charge now'}
         </button>
-      {/if}
-    </div>
+      </div>
+    {/if}
   {/if}
 </section>
 
@@ -423,12 +455,89 @@
     cursor: default;
   }
 
-  .later-row {
+  /* Peer payment-choice cards. */
+  .choices {
     display: grid;
-    gap: 0.3rem;
-    margin-top: 0.4rem;
+    gap: 0.5rem;
+    margin-top: 0.2rem;
+  }
+
+  .choice {
+    display: grid;
+    gap: 0.15rem;
+    text-align: left;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  }
+
+  .choice:hover:not(:disabled) {
+    border-color: var(--color-primary);
+  }
+
+  .choice:active:not(:disabled) {
+    transform: scale(0.99);
+  }
+
+  .choice.active {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .choice-title {
+    font-weight: 700;
+    font-size: 0.94rem;
+    color: var(--color-text);
+  }
+
+  .choice.active .choice-title {
+    color: var(--color-primary);
+  }
+
+  .choice-sub {
+    font-size: 0.82rem;
+    color: var(--color-muted);
+    line-height: 1.4;
+  }
+
+  .panel {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 0.3rem;
     padding-top: 0.7rem;
     border-top: 1px solid var(--color-border);
+  }
+
+  .panel.hidden {
+    display: none;
+  }
+
+  .panel-submit {
+    justify-self: start;
+    margin-top: 0.2rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    background: var(--color-surface-tint, var(--color-primary-soft));
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  .panel-submit:hover:not(:disabled) {
+    background: var(--color-primary-soft);
+  }
+
+  .panel-submit:active:not(:disabled) {
+    transform: scale(0.99);
+  }
+
+  .panel-submit:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 
   .pay-phone {
@@ -460,51 +569,4 @@
     flex-shrink: 0;
   }
 
-  .later-btn {
-    justify-self: start;
-    background: transparent;
-    color: var(--color-primary);
-    font-weight: 600;
-    padding: 0.4rem 0;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  .later-btn:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
-  .later-note {
-    font-size: 0.8rem;
-    line-height: 1.4;
-  }
-
-  .remote-row {
-    display: grid;
-    gap: 0.5rem;
-    margin-top: 0.4rem;
-    padding-top: 0.7rem;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .remote-submit {
-    justify-self: start;
-    margin-top: 0.2rem;
-    padding: 0.7rem 1.1rem;
-    border-radius: var(--radius-md);
-    font-weight: 600;
-    background: var(--color-surface-tint, var(--color-primary-soft));
-    color: var(--color-primary);
-    border: 1px solid var(--color-primary);
-  }
-
-  .remote-submit:hover:not(:disabled) {
-    background: var(--color-primary-soft);
-  }
-
-  .remote-submit:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
 </style>

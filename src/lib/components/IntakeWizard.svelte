@@ -5,6 +5,7 @@
     currentTriageNode,
     currentPhaseIndex,
     STEP_ORDER,
+    stepsFor,
     type WizardStep,
     type IntakeState
   } from '$lib/stores/intakeStore';
@@ -150,6 +151,14 @@
     intakeStore.selectOption(option);
   }
 
+  // Enter (or the mobile keyboard's Go) submits the step like clicking
+  // Continue. Never on triage (nothing to submit) or review (Enter must not
+  // bypass the payment step's own buttons).
+  function onStepSubmit() {
+    if (state.step === 'triage' || state.step === 'review' || state.step === 'confirmation') return;
+    next();
+  }
+
   async function submit() {
     await intakeStore.submit();
   }
@@ -208,10 +217,19 @@
     });
   }
 
+  // Draft-restore acknowledgment: explains why the form isn't blank and offers
+  // the only mid-flow reset that exists.
+  let showDraftBanner = false;
+
+  function startOver() {
+    showDraftBanner = false;
+    intakeStore.reset();
+  }
+
   onMount(async () => {
     // Restore any saved draft, then start persisting. Set the scroll baseline
     // AFTER hydrating so a restored draft doesn't auto-scroll on page load.
-    intakeStore.hydrate();
+    showDraftBanner = intakeStore.hydrate();
     prevStep = $intakeStore.step;
     try {
       const res = await fetch('/api/config');
@@ -232,6 +250,16 @@
   // Remount (and re-animate) the pane per step — and per triage node, since
   // triage questions swap without a step change.
   $: paneKey = state.step === 'triage' ? `triage:${state.currentNodeId}` : state.step;
+  // Overall progress, mildly front-loaded (^0.75): early steps register as
+  // slightly bigger jumps so the form never feels long after a page or two,
+  // without lying outright about how far along they are. Answering the first
+  // triage question counts as a half-step so the bar moves on the very first tap.
+  $: stepOrder = stepsFor(state);
+  $: rawIdx =
+    state.step === 'triage' && state.triageHistory.length > 0
+      ? 0.5
+      : Math.max(0, stepOrder.indexOf(state.step));
+  $: progress = Math.pow(rawIdx / (stepOrder.length - 1), 0.75);
   $: photosRequired = photosRequiredFor(state);
   $: scheduleLookup(state);
   $: trackSlow(state.returning.status);
@@ -278,10 +306,35 @@
     </div>
   {/if}
 
+  {#if showDraftBanner && state.step !== 'confirmation'}
+    <div class="draft-bar" role="status">
+      <span>Welcome back — we saved your progress.</span>
+      <span class="draft-actions">
+        <button type="button" class="draft-reset" on:click={startOver}>Start over</button>
+        <button
+          type="button"
+          class="draft-dismiss"
+          aria-label="Dismiss"
+          on:click={() => (showDraftBanner = false)}
+        >
+          ✕
+        </button>
+      </span>
+    </div>
+  {/if}
+
   {#if state.step !== 'confirmation'}
     <div class="head">
       <PhaseStepper currentIndex={phaseIdx} />
-      <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
+      <div class="progress-track" aria-hidden="true">
+        <div class="progress-fill" style="width: {(progress * 100).toFixed(1)}%"></div>
+      </div>
+      <div class="step-row">
+        <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
+        {#if state.step === 'triage' && state.triageHistory.length === 0}
+          <p class="time-note">Takes about 2 minutes</p>
+        {/if}
+      </div>
     </div>
   {/if}
 
@@ -306,7 +359,10 @@
     />
   {/if}
 
-  <div class="step-body">
+  <!-- A real form so Enter / the mobile keyboard's Go advances the step. All
+       buttons in the tree are explicitly type="button", so nothing else submits. -->
+  <form class="step-body" novalidate on:submit|preventDefault={onStepSubmit}>
+    <button type="submit" class="implicit-submit" tabindex="-1" aria-hidden="true"></button>
     {#key paneKey}
     <div class="step-pane" data-dir={navDir}>
     {#if state.step === 'triage' && node}
@@ -406,7 +462,7 @@
     {/if}
     </div>
     {/key}
-  </div>
+  </form>
 
   {#if state.step !== 'confirmation'}
     {@const atReview = state.step === 'review'}
@@ -568,7 +624,35 @@
 
   .head {
     display: grid;
-    gap: 0.4rem;
+    gap: 0.45rem;
+  }
+
+  .progress-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-primary-gradient);
+    transition: width 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  .step-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  .time-note {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--color-muted);
+    white-space: nowrap;
   }
 
   /* Directional step entrances: forward slides in from the right, back from
@@ -613,9 +697,68 @@
     font-size: 0.95rem;
   }
 
+  .step-body {
+    margin: 0;
+  }
+
+  /* Default submit target for implicit form submission (Enter / mobile Go);
+     visually hidden but clickable by the browser's submission algorithm. */
+  .implicit-submit {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   /* Focus target for step changes (programmatic only) — no visible ring. */
   .step-label:focus {
     outline: none;
+  }
+
+  /* Restored-draft acknowledgment bar. */
+  .draft-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    border-radius: var(--radius-md);
+    background: var(--color-light-blue-soft);
+    border: 1px solid rgba(96, 175, 230, 0.45);
+    font-size: 0.88rem;
+    color: var(--color-text);
+  }
+
+  .draft-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .draft-reset {
+    font-weight: 600;
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    padding: 0.2rem 0.2rem;
+  }
+
+  .draft-dismiss {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    padding: 0.2rem 0.4rem;
+    border-radius: 6px;
+  }
+
+  .draft-dismiss:hover {
+    color: var(--color-text);
+    background: rgba(255, 255, 255, 0.6);
   }
 
   /* Persistent phone escape-hatch shown on every emergency step. */
