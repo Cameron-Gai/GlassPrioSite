@@ -7,12 +7,15 @@
   export let icon: IconKey | undefined = undefined;
   export let emphasis: 'default' | 'emergency' = 'default';
   export let disabled = false;
+  /** Brief post-tap highlight while the wizard advances. */
+  export let selected = false;
 </script>
 
 <button
   type="button"
   class="option"
   class:emergency={emphasis === 'emergency'}
+  class:selected
   {disabled}
   on:click
 >
@@ -61,6 +64,24 @@
     outline: none;
     box-shadow: var(--ring-focus);
     border-color: var(--color-primary);
+  }
+
+  /* Touch feedback: hover never fires on phones, so the press itself responds. */
+  .option:active:not(:disabled) {
+    transform: scale(0.985);
+    transition-duration: 0.06s;
+  }
+
+  .option.selected {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+    box-shadow: var(--ring-focus);
+  }
+
+  .option.emergency.selected {
+    border-color: var(--color-emergency);
+    background: var(--color-emergency-bg);
+    box-shadow: 0 0 0 4px rgba(228, 0, 43, 0.16);
   }
 
   .option.emergency {

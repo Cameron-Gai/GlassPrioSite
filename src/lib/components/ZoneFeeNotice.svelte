@@ -140,7 +140,7 @@
   }
 
   .notice.in-area {
-    border-color: rgba(17, 163, 122, 0.35);
+    border-color: rgba(96, 175, 230, 0.5);
     background: var(--color-accent-bg);
   }
 

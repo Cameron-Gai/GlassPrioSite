@@ -221,11 +221,15 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--color-surface);
-    transition: border-color 0.15s ease, background 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
   }
 
   .day:hover {
     border-color: var(--color-primary);
+  }
+
+  .day:active {
+    transform: scale(0.97);
   }
 
   .day.active {
@@ -258,11 +262,15 @@
     font-weight: 600;
     font-size: 0.86rem;
     color: var(--color-text);
-    transition: border-color 0.15s ease, background 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
   }
 
   .window:hover {
     border-color: var(--color-primary);
+  }
+
+  .window:active {
+    transform: scale(0.96);
   }
 
   .window.active {
@@ -288,7 +296,11 @@
     background: linear-gradient(180deg, var(--color-primary-soft), #ffffff 80%);
     box-shadow: var(--shadow-sm);
     text-align: left;
-    transition: border-color 0.15s ease, background 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  }
+
+  .tile.priority:active {
+    transform: scale(0.99);
   }
 
   .tile.priority.active {

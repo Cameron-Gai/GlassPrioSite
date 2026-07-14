@@ -2,9 +2,14 @@
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PaymentStep from './PaymentStep.svelte';
   import PhotoUploadMock from './PhotoUploadMock.svelte';
-  import type { IntakeState } from '$lib/stores/intakeStore';
+  import { intakeStore, type IntakeState, type WizardStep } from '$lib/stores/intakeStore';
 
   export let state: IntakeState;
+
+  /** Jump to a step to fix something; the wizard brings them straight back here. */
+  function edit(step: WizardStep) {
+    intakeStore.beginEdit(step);
+  }
 
   /** Human-readable requested timing: a picked date, 'flexible', or priority/emergency. */
   function timingLabel(s: IntakeState): string {
@@ -24,7 +29,7 @@
   }
 </script>
 
-<div class="review fade-in">
+<div class="review">
   {#if state.selectedJobType}
     <JobTypeBanner
       job={state.selectedJobType}
@@ -34,8 +39,12 @@
     />
   {/if}
 
+  {#if !state.isEmergency}
   <section class="block">
-    <h3>What's going on</h3>
+    <h3>
+      What's going on
+      <button type="button" class="edit" on:click={() => edit('issue')}>Edit</button>
+    </h3>
     <dl>
       <div><dt>Location</dt><dd>{state.issueDetails.serviceLocation || '—'}</dd></div>
       <div><dt>When</dt><dd>{state.issueDetails.happenedAt || '—'}</dd></div>
@@ -69,11 +78,31 @@
       </div>
     </dl>
   </section>
+  {/if}
 
   <section class="block">
-    <h3>Property & access</h3>
+    <h3>
+      Property &amp; access
+      <button
+        type="button"
+        class="edit"
+        on:click={() => edit(state.isEmergency ? 'property-type' : 'site')}
+      >
+        Edit
+      </button>
+    </h3>
     <dl>
-      <div><dt>Property type</dt><dd>{state.propertyType || '—'}</dd></div>
+      <div>
+        <dt>Property type</dt>
+        <dd>
+          {state.propertyType || '—'}
+          {#if !state.isEmergency}
+            <button type="button" class="edit inline" on:click={() => edit('property-type')}>
+              change
+            </button>
+          {/if}
+        </dd>
+      </div>
       {#if state.propertyType === 'Business' && state.propertyDetails.businessName}
         <div><dt>Business</dt><dd>{state.propertyDetails.businessName}</dd></div>
       {/if}
@@ -102,7 +131,10 @@
   </section>
 
   <section class="block">
-    <h3>Contact</h3>
+    <h3>
+      Contact
+      <button type="button" class="edit" on:click={() => edit('contact')}>Edit</button>
+    </h3>
     <p>
       {state.customer.firstName} {state.customer.lastName}<br />
       {state.customer.phone}<br />
@@ -111,7 +143,10 @@
   </section>
 
   <section class="block">
-    <h3>Service address</h3>
+    <h3>
+      Service address
+      <button type="button" class="edit" on:click={() => edit('address')}>Edit</button>
+    </h3>
     <p>
       {state.address.street}<br />
       {state.address.city}, {state.address.state} {state.address.zip}
@@ -119,7 +154,12 @@
   </section>
 
   <section class="block">
-    <h3>Requested timing</h3>
+    <h3>
+      Requested timing
+      {#if !state.isEmergency}
+        <button type="button" class="edit" on:click={() => edit('scheduling')}>Edit</button>
+      {/if}
+    </h3>
     <p>{timingLabel(state)}</p>
     {#if !state.isEmergency && !state.priorityUpgrade}
       <p class="muted small">
@@ -129,7 +169,12 @@
   </section>
 
   <section class="block">
-    <h3>Photos</h3>
+    <h3>
+      Photos
+      {#if !state.isEmergency}
+        <button type="button" class="edit" on:click={() => edit('site')}>Edit</button>
+      {/if}
+    </h3>
     {#if state.isEmergency}
       <!-- The emergency fast-track skips the photo step, so offer it here. -->
       <p class="muted small">Optional — a quick photo of the damage helps our crew come prepared.</p>
@@ -168,6 +213,39 @@
     letter-spacing: 0.06em;
     color: var(--color-muted);
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .edit {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: var(--color-primary);
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  }
+
+  .edit:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
+  }
+
+  .edit:active {
+    transform: scale(0.95);
+  }
+
+  .edit.inline {
+    margin-left: 0.4rem;
+    font-size: 0.72rem;
+    padding: 0.05rem 0.4rem;
+    font-weight: 600;
   }
 
   dl {

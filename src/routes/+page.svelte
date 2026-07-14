@@ -15,7 +15,8 @@
 </svelte:head>
 
 <div class="page">
-  <header class="topbar">
+  <header class="topbar-shell">
+  <div class="topbar">
     <div class="brand">
       <span class="reflective-ray" aria-hidden="true">
         <span class="ray ray-red"></span>
@@ -43,6 +44,7 @@
         {openNow ? 'Open now' : 'After hours — emergencies welcome'}
       </span>
     </div>
+  </div>
   </header>
 
   <main>
@@ -87,6 +89,18 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+  }
+
+  /* Sticky frost band: the phone number and open/closed status stay one
+     glance away no matter how far the form scrolls. */
+  .topbar-shell {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--color-surface-frost);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border-bottom: 1px solid var(--color-divider);
   }
 
   .topbar {
@@ -232,7 +246,7 @@
   .status[data-open='true'] {
     color: var(--color-accent);
     background: var(--color-accent-bg);
-    border-color: rgba(15, 169, 124, 0.28);
+    border-color: rgba(96, 175, 230, 0.45);
   }
 
   .status-dot {
@@ -244,7 +258,7 @@
 
   .status[data-open='true'] .status-dot {
     background: var(--color-accent);
-    box-shadow: 0 0 0 4px rgba(15, 169, 124, 0.18);
+    box-shadow: 0 0 0 4px rgba(96, 175, 230, 0.28);
   }
 
   main {

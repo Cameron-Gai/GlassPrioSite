@@ -87,6 +87,10 @@ export interface IntakeState {
   confirmationNumber: string | null;
   submitting: boolean;
   submitError: string | null;
+  /** True while on an edit detour launched from a review-section Edit link —
+   *  the wizard's primary button returns straight to review instead of
+   *  continuing forward. */
+  returnToReview: boolean;
   /** Returning-customer autofill state (greet + confirm flow). Runs inline on the
    *  contact step once we have 2+ identifying fields; matches on any 2 of
    *  {phone, email, name, address}. customerId/locationId link the booking to the
@@ -211,6 +215,7 @@ function initialState(): IntakeState {
     confirmationNumber: null,
     submitting: false,
     submitError: null,
+    returnToReview: false,
     returning: { status: 'idle', firstName: null, customerId: null, locationId: null }
   };
 }
@@ -276,6 +281,7 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
     remoteConsult: false,
     submitting: false,
     submitError: null,
+    returnToReview: false,
     returning: { status: 'idle', firstName: null, customerId: null, locationId: null }
   };
   // Guard against a step that isn't in this request's sequence (e.g. a draft
@@ -430,6 +436,19 @@ function createIntakeStore() {
       if (idx < 0 || idx + 1 >= order.length) return state;
       return { ...state, step: order[idx + 1] };
     });
+  }
+
+  /** Jump from the review screen to an earlier step to fix something. The
+   *  wizard's primary button then returns straight to review (finishEdit). */
+  function beginEdit(step: WizardStep) {
+    store.update((state) => {
+      if (!stepsFor(state).includes(step) || step === 'review') return state;
+      return { ...state, step, returnToReview: true };
+    });
+  }
+
+  function finishEdit() {
+    store.update((state) => ({ ...state, step: 'review', returnToReview: false }));
   }
 
   function goBack() {
@@ -884,6 +903,8 @@ function createIntakeStore() {
     acceptPriorityUpgrade,
     declinePriorityUpgrade,
     advance,
+    beginEdit,
+    finishEdit,
     goBack,
     updateCustomer,
     updateAddress,

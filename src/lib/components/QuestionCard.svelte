@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import OptionButton from './OptionButton.svelte';
   import OptionCard from './OptionCard.svelte';
   import YesNoTiles from './YesNoTiles.svelte';
@@ -8,9 +9,35 @@
   export let onSelect: (option: TriageOption) => void;
 
   $: isEmergencyDetail = node.id === 'emergency-which';
+
+  // Brief "selected" flash before advancing, so a tap visibly registers instead
+  // of the screen just swapping. Skipped under prefers-reduced-motion.
+  let flashId: string | null = null;
+  let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function pick(option: TriageOption) {
+    if (flashTimer) return; // ignore double-taps mid-flash
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      onSelect(option);
+      return;
+    }
+    flashId = option.id;
+    flashTimer = setTimeout(() => {
+      flashTimer = null;
+      flashId = null;
+      onSelect(option);
+    }, 160);
+  }
+
+  onDestroy(() => {
+    if (flashTimer) clearTimeout(flashTimer);
+  });
 </script>
 
-<section class="card fade-in">
+<section class="card">
   <header>
     <h2>{node.question}</h2>
     {#if node.helperText}
@@ -19,7 +46,7 @@
   </header>
 
   {#if node.layout === 'yesno'}
-    <YesNoTiles options={node.options} {onSelect} />
+    <YesNoTiles options={node.options} onSelect={pick} selectedId={flashId} />
   {:else if node.layout === 'cards'}
     <div class="grid">
       {#each node.options as option (option.id)}
@@ -27,7 +54,8 @@
           label={option.label}
           helperText={option.helperText}
           icon={option.icon}
-          on:click={() => onSelect(option)}
+          selected={flashId === option.id}
+          on:click={() => pick(option)}
         />
       {/each}
     </div>
@@ -39,7 +67,8 @@
           helperText={option.helperText}
           icon={option.icon}
           emphasis={isEmergencyDetail ? 'emergency' : 'default'}
-          on:click={() => onSelect(option)}
+          selected={flashId === option.id}
+          on:click={() => pick(option)}
         />
       {/each}
     </div>

@@ -167,7 +167,7 @@
   .chip.rebate {
     background: var(--color-accent-bg);
     color: var(--color-accent);
-    border-color: rgba(17, 163, 122, 0.3);
+    border-color: rgba(96, 175, 230, 0.4);
   }
 
   .chip.duration {

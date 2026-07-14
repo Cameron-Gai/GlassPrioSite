@@ -110,11 +110,15 @@
     font-weight: 600;
     color: var(--color-text);
     text-align: left;
-    transition: border-color 0.15s ease, background 0.15s ease;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
   }
 
   .tile:hover {
     border-color: var(--color-primary);
+  }
+
+  .tile:active {
+    transform: scale(0.98);
   }
 
   .tile.active {

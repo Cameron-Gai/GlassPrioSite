@@ -5,9 +5,11 @@
   export let label: string;
   export let helperText: string | undefined = undefined;
   export let icon: IconKey | undefined = undefined;
+  /** Brief post-tap highlight while the wizard advances. */
+  export let selected = false;
 </script>
 
-<button type="button" class="card" on:click>
+<button type="button" class="card" class:selected on:click>
   {#if icon}
     <span class="icon" aria-hidden="true">
       <ServiceIcon {icon} size={26} />
@@ -48,6 +50,18 @@
   .card:focus-visible {
     outline: none;
     border-color: var(--color-primary);
+    box-shadow: var(--ring-focus);
+  }
+
+  /* Touch feedback: hover never fires on phones, so the press itself responds. */
+  .card:active {
+    transform: scale(0.98);
+    transition-duration: 0.06s;
+  }
+
+  .card.selected {
+    border-color: var(--color-primary);
+    background: var(--color-primary-soft);
     box-shadow: var(--ring-focus);
   }
 

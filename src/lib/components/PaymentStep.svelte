@@ -414,6 +414,10 @@
   .pay-btn:hover:not(:disabled) {
     background: var(--color-primary-hover);
   }
+
+  .pay-btn:active:not(:disabled) {
+    transform: scale(0.99);
+  }
   .pay-btn:disabled {
     opacity: 0.7;
     cursor: default;

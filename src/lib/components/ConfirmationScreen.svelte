@@ -56,7 +56,7 @@
   }
 </script>
 
-<section class="confirm fade-in">
+<section class="confirm">
   <div class="hero">
     <span class="check" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">

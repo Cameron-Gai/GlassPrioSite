@@ -4,12 +4,20 @@
 
   export let options: TriageOption[];
   export let onSelect: (option: TriageOption) => void;
+  /** Option id to render briefly highlighted after a tap. */
+  export let selectedId: string | null = null;
 </script>
 
 <div class="tiles">
   {#each options as option (option.id)}
     {@const tone = option.id.includes('yes') ? 'yes' : 'no'}
-    <button type="button" class="tile" data-tone={tone} on:click={() => onSelect(option)}>
+    <button
+      type="button"
+      class="tile"
+      class:selected={selectedId === option.id}
+      data-tone={tone}
+      on:click={() => onSelect(option)}
+    >
       <span class="icon" aria-hidden="true">
         {#if option.icon}
           <ServiceIcon icon={option.icon} size={32} />
@@ -57,6 +65,22 @@
 
   .tile:focus-visible {
     outline: none;
+    border-color: var(--color-primary);
+    box-shadow: var(--ring-focus);
+  }
+
+  /* Touch feedback: hover never fires on phones, so the press itself responds. */
+  .tile:active {
+    transform: scale(0.98);
+    transition-duration: 0.06s;
+  }
+
+  .tile.selected[data-tone='yes'] {
+    border-color: var(--color-emergency);
+    box-shadow: 0 0 0 4px rgba(228, 0, 43, 0.16);
+  }
+
+  .tile.selected[data-tone='no'] {
     border-color: var(--color-primary);
     box-shadow: var(--ring-focus);
   }

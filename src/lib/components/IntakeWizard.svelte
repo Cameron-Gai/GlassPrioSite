@@ -4,6 +4,7 @@
     intakeStore,
     currentTriageNode,
     currentPhaseIndex,
+    STEP_ORDER,
     type WizardStep,
     type IntakeState
   } from '$lib/stores/intakeStore';
@@ -130,12 +131,23 @@
       // while the inline prompt's "Yes, that's me" links the account.
       if (st === 'found') intakeStore.dismissReturningCustomer();
     }
+    // Edit detour from review: validate, then return straight to review.
+    if (s.returnToReview) {
+      intakeStore.finishEdit();
+      return;
+    }
     intakeStore.advance();
   }
 
   function back() {
     attempted = false;
+    navDir = 'back'; // also covers triage-node retreats, which onStepChange can't see
     intakeStore.goBack();
+  }
+
+  function selectTriageOption(option: Parameters<typeof intakeStore.selectOption>[0]) {
+    navDir = 'forward'; // triage-node advances don't change `step`
+    intakeStore.selectOption(option);
   }
 
   async function submit() {
@@ -170,14 +182,28 @@
   let stepLabelEl: HTMLParagraphElement | undefined;
   let prevStep: WizardStep | null = null;
 
+  // Direction of the last navigation — drives the slide-in side so forward
+  // feels like progress and back feels like retreat. Step-level moves are
+  // derived from step order (covers the review Edit links too); triage-node
+  // moves within the triage step are set explicitly in back()/onSelect.
+  let navDir: 'forward' | 'back' = 'forward';
+
+  function reduceMotion(): boolean {
+    return (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  }
+
   function onStepChange(step: WizardStep) {
     if (prevStep === null || step === prevStep) {
       prevStep = step; // initial render (or draft restore) — don't scroll
       return;
     }
+    navDir = STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(prevStep) ? 'forward' : 'back';
     prevStep = step;
     tick().then(() => {
-      wizardEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      wizardEl?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
       stepLabelEl?.focus({ preventScroll: true });
     });
   }
@@ -203,11 +229,15 @@
   $: onStepChange(state.step);
   $: node = $currentTriageNode;
   $: phaseIdx = $currentPhaseIndex;
+  // Remount (and re-animate) the pane per step — and per triage node, since
+  // triage questions swap without a step change.
+  $: paneKey = state.step === 'triage' ? `triage:${state.currentNodeId}` : state.step;
   $: photosRequired = photosRequiredFor(state);
   $: scheduleLookup(state);
   $: trackSlow(state.returning.status);
   $: canGoBack =
     state.step !== 'confirmation' &&
+    !state.returnToReview &&
     (state.step !== 'triage' || state.triageHistory.length > 0);
   $: showBanner =
     state.selectedJobType &&
@@ -277,8 +307,10 @@
   {/if}
 
   <div class="step-body">
+    {#key paneKey}
+    <div class="step-pane" data-dir={navDir}>
     {#if state.step === 'triage' && node}
-      <QuestionCard {node} onSelect={(option) => intakeStore.selectOption(option)} />
+      <QuestionCard {node} onSelect={selectTriageOption} />
     {:else if state.step === 'property-type'}
       <header class="screen-head">
         <h2>What type of property is this for?</h2>
@@ -372,6 +404,8 @@
     {:else if state.step === 'confirmation'}
       <ConfirmationScreen {state} onReset={reset} />
     {/if}
+    </div>
+    {/key}
   </div>
 
   {#if state.step !== 'confirmation'}
@@ -399,7 +433,11 @@
           <button type="button" class="primary" disabled>Checking your area…</button>
         {:else if showContinue}
           <button type="button" class="primary" on:click={next} disabled={contactChecking}>
-            {contactChecking ? 'Checking your account…' : 'Continue'}
+            {contactChecking
+              ? 'Checking your account…'
+              : state.returnToReview
+                ? 'Back to review'
+                : 'Continue'}
           </button>
         {/if}
       </div>
@@ -531,6 +569,41 @@
   .head {
     display: grid;
     gap: 0.4rem;
+  }
+
+  /* Directional step entrances: forward slides in from the right, back from
+     the left — navigation gets a sense of place. Entrance-only (no exit), so
+     there's never a double-render. Skipped under prefers-reduced-motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .step-pane[data-dir='forward'] {
+      animation: pane-forward 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .step-pane[data-dir='back'] {
+      animation: pane-back 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+  }
+
+  @keyframes pane-forward {
+    from {
+      opacity: 0;
+      transform: translateX(26px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes pane-back {
+    from {
+      opacity: 0;
+      transform: translateX(-26px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   .step-label {
@@ -740,6 +813,10 @@
     transform: translateY(-1px);
   }
 
+  .primary:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
   .primary:disabled {
     opacity: 0.75;
     cursor: default;
@@ -755,12 +832,29 @@
     border-color: var(--color-primary);
   }
 
+  .ghost:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
   @media (max-width: 520px) {
     .screen-head h2 {
       font-size: 1.2rem;
     }
+    /* Keep Continue reachable on long steps: the action row sticks to the
+       bottom of the viewport (frosted, edge-to-edge within the panel) until
+       its natural position scrolls into view. */
     .actions {
       flex-direction: column-reverse;
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      margin: 0 -1.1rem -1.1rem;
+      padding: 0.7rem 1.1rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+      background: var(--color-surface-frost);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid var(--color-border);
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     }
     .actions.back-only {
       flex-direction: row;
