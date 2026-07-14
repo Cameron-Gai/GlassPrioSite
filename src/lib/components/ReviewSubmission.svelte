@@ -1,9 +1,27 @@
 <script lang="ts">
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PaymentStep from './PaymentStep.svelte';
+  import PhotoUploadMock from './PhotoUploadMock.svelte';
   import type { IntakeState } from '$lib/stores/intakeStore';
 
   export let state: IntakeState;
+
+  /** Human-readable requested timing: a picked date, 'flexible', or priority/emergency. */
+  function timingLabel(s: IntakeState): string {
+    if (s.priorityUpgrade) return 'Priority Service — within 2 hours';
+    if (s.isEmergency) return 'Emergency — immediate dispatch';
+    const pref = s.schedulingPreference;
+    if (!pref) return '—';
+    if (pref === 'flexible') return 'Flexible — first available';
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(pref);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      const day = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const window = s.specialInstructions.preferredWindow;
+      return window ? `${day} · ${window}` : day;
+    }
+    return pref;
+  }
 </script>
 
 <div class="review fade-in">
@@ -71,7 +89,6 @@
         <dd>{state.specialInstructions.hasDog ? 'Yes' : 'No'}</dd>
       </div>
       <div><dt>Parking</dt><dd>{state.specialInstructions.parkingNotes || '—'}</dd></div>
-      <div><dt>Preferred window</dt><dd>{state.specialInstructions.preferredWindow || '—'}</dd></div>
       {#if state.onSiteContact.differs}
         <div class="full">
           <dt>On-site contact</dt>
@@ -102,17 +119,26 @@
   </section>
 
   <section class="block">
-    <h3>Preferred window</h3>
-    <p>{state.priorityUpgrade ? 'Priority Service — within 2 hours' : state.schedulingPreference || '—'}</p>
+    <h3>Requested timing</h3>
+    <p>{timingLabel(state)}</p>
+    {#if !state.isEmergency && !state.priorityUpgrade}
+      <p class="muted small">
+        This is a request — our team will confirm, and we'll contact you if it doesn't work out.
+      </p>
+    {/if}
   </section>
 
   <section class="block">
     <h3>Photos</h3>
-    {#if state.issueDetails.photos.length === 0}
+    {#if state.isEmergency}
+      <!-- The emergency fast-track skips the photo step, so offer it here. -->
+      <p class="muted small">Optional — a quick photo of the damage helps our crew come prepared.</p>
+      <PhotoUploadMock photos={state.issueDetails.photos} />
+    {:else if state.issueDetails.photos.length === 0}
       <p class="muted">No photos uploaded.</p>
     {:else}
       <div class="thumbs">
-        {#each state.issueDetails.photos as photo (photo.name)}
+        {#each state.issueDetails.photos as photo (photo.id)}
           <img class="thumb" src={photo.dataUrl} alt={photo.name} title={photo.name} />
         {/each}
       </div>
@@ -178,6 +204,12 @@
   .muted {
     color: var(--color-muted);
     margin: 0;
+  }
+
+  .small {
+    font-size: 0.84rem;
+    margin-top: 0.35rem;
+    margin-bottom: 0.5rem;
   }
 
   .thumbs {

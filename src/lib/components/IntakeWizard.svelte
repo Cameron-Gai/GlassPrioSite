@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import {
     intakeStore,
     currentTriageNode,
@@ -16,6 +16,7 @@
   import SiteAccessForm from './SiteAccessForm.svelte';
   import CustomerInfoForm from './CustomerInfoForm.svelte';
   import AddressForm from './AddressForm.svelte';
+  import ZoneFeeNotice from './ZoneFeeNotice.svelte';
   import SchedulingPreferenceForm from './SchedulingPreferenceForm.svelte';
   import ReviewSubmission from './ReviewSubmission.svelte';
   import ConfirmationScreen from './ConfirmationScreen.svelte';
@@ -125,7 +126,9 @@
         return;
       }
       if (st === 'checking' && !allowSkipCheck) return;
-      if (st === 'found') return; // must answer the inline prompt first
+      // A found match never blocks the button: Continue means "I'm new here",
+      // while the inline prompt's "Yes, that's me" links the account.
+      if (st === 'found') intakeStore.dismissReturningCustomer();
     }
     intakeStore.advance();
   }
@@ -159,9 +162,31 @@
   let testMode = false;
   let serviceReady = true;
 
+  // Step changes scroll the wizard back into view and move focus to the step
+  // label — on mobile, Continue sits at the bottom of a long page, so without
+  // this the next step renders with the viewport still at the bottom (and
+  // screen readers get no announcement that the step changed).
+  let wizardEl: HTMLDivElement | undefined;
+  let stepLabelEl: HTMLParagraphElement | undefined;
+  let prevStep: WizardStep | null = null;
+
+  function onStepChange(step: WizardStep) {
+    if (prevStep === null || step === prevStep) {
+      prevStep = step; // initial render (or draft restore) — don't scroll
+      return;
+    }
+    prevStep = step;
+    tick().then(() => {
+      wizardEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      stepLabelEl?.focus({ preventScroll: true });
+    });
+  }
+
   onMount(async () => {
-    // Restore any saved draft, then start persisting.
+    // Restore any saved draft, then start persisting. Set the scroll baseline
+    // AFTER hydrating so a restored draft doesn't auto-scroll on page load.
     intakeStore.hydrate();
+    prevStep = $intakeStore.step;
     try {
       const res = await fetch('/api/config');
       if (res.ok) {
@@ -175,6 +200,7 @@
   });
 
   $: state = $intakeStore;
+  $: onStepChange(state.step);
   $: node = $currentTriageNode;
   $: phaseIdx = $currentPhaseIndex;
   $: photosRequired = photosRequiredFor(state);
@@ -202,7 +228,7 @@
     <a class="call-btn" href={SUPPORT_PHONE_HREF}>Call {SUPPORT_PHONE}</a>
   </div>
 {:else}
-<div class="wizard">
+<div class="wizard" bind:this={wizardEl}>
   {#if testMode && state.step === 'triage'}
     <div class="test-presets">
       <p class="tp-title">🧪 Test mode — quick presets</p>
@@ -225,8 +251,20 @@
   {#if state.step !== 'confirmation'}
     <div class="head">
       <PhaseStepper currentIndex={phaseIdx} />
-      <p class="step-label">{stepLabels[state.step]}</p>
+      <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
     </div>
+  {/if}
+
+  {#if state.isEmergency && state.step !== 'confirmation'}
+    <!-- Emergencies get a persistent escape hatch to the phone on every step. -->
+    <a class="call-bar" href={SUPPORT_PHONE_HREF}>
+      <span class="call-bar-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+        </svg>
+      </span>
+      <span>Faster by phone? Call <strong>{SUPPORT_PHONE}</strong> — this form takes about a minute either way.</span>
+    </a>
   {/if}
 
   {#if showBanner && state.selectedJobType}
@@ -272,6 +310,7 @@
         <h2>Where is the service needed?</h2>
       </header>
       <AddressForm value={state.address} showErrors={attempted} />
+      <ZoneFeeNotice zip={state.address.zip} jobTypeName={state.selectedJobType?.name ?? ''} />
     {:else if state.step === 'contact'}
       <header class="screen-head">
         <h2>How can we reach you?</h2>
@@ -295,7 +334,10 @@
               We found an account matching your details. Is this you?
             {/if}
           </p>
-          <p class="rc-sub">We'll link this request to your file and fill in anything you left blank.</p>
+          <p class="rc-sub">
+            We'll link this request to your file and fill in anything you left blank. Not you?
+            Just hit Continue.
+          </p>
           <div class="rc-actions">
             <button type="button" class="rc-yes" on:click={confirmReturning}>Yes, that's me</button>
             <button type="button" class="rc-no" on:click={denyReturning}>No, I'm new here</button>
@@ -312,7 +354,7 @@
       </header>
       <SchedulingPreferenceForm value={state.schedulingPreference} />
       {#if attempted && !isStepValid(state)}
-        <p class="form-error">Pick a timing option to continue.</p>
+        <p class="form-error">Pick a day — or Flexible — to continue.</p>
       {/if}
     {:else if state.step === 'review'}
       <header class="screen-head">
@@ -343,7 +385,6 @@
     {@const showContinue = !['triage', 'review'].includes(state.step)}
     {@const contactChecking =
       state.step === 'contact' && state.returning.status === 'checking' && !allowSkipCheck}
-    {@const contactFound = state.step === 'contact' && state.returning.status === 'found'}
     {@const showActions = canGoBack || showWizardSubmit || showContinue || showFeeLoading}
     {#if showActions}
       <div class="actions" class:back-only={canGoBack && !showWizardSubmit && !showContinue && !showFeeLoading}>
@@ -357,12 +398,7 @@
         {:else if showFeeLoading}
           <button type="button" class="primary" disabled>Checking your area…</button>
         {:else if showContinue}
-          <button
-            type="button"
-            class="primary"
-            on:click={next}
-            disabled={contactChecking || contactFound}
-          >
+          <button type="button" class="primary" on:click={next} disabled={contactChecking}>
             {contactChecking ? 'Checking your account…' : 'Continue'}
           </button>
         {/if}
@@ -502,6 +538,47 @@
     color: var(--color-text);
     font-weight: 600;
     font-size: 0.95rem;
+  }
+
+  /* Focus target for step changes (programmatic only) — no visible ring. */
+  .step-label:focus {
+    outline: none;
+  }
+
+  /* Persistent phone escape-hatch shown on every emergency step. */
+  .call-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: var(--radius-md);
+    background: var(--color-emergency-bg);
+    border: 1px solid var(--color-emergency-soft, var(--color-border));
+    color: var(--color-text);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    text-decoration: none;
+  }
+
+  .call-bar strong {
+    color: var(--color-emergency);
+    white-space: nowrap;
+  }
+
+  .call-bar:hover strong {
+    text-decoration: underline;
+  }
+
+  .call-bar-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--color-emergency);
+    color: #fff;
+    flex-shrink: 0;
   }
 
   .screen-head {

@@ -155,10 +155,12 @@ export const jobTypes: JobType[] = [
     customerLabel: 'Glass Replacement (1–4 panes) — Consultation',
     summary: 'On-site assessment and quote for replacing one to four panes / IG units.',
     includes: ['On-site assessment', 'Measurements taken', 'Written quote provided'],
+    // The on-site consultation charge is zone-based (GlassReports zone map) —
+    // never promise a flat number or "free" here; the exact amount is shown
+    // once we know the customer's ZIP.
     pricing: {
-      display: '$45 trip charge',
-      detail: 'Credited toward the repair when you proceed.',
-      rebate: 'Credited toward repair'
+      display: 'Visit charge by area',
+      detail: 'The exact on-site visit charge for your address is shown before you submit.'
     },
     consultationFormat: 'on-site'
   },
@@ -181,7 +183,8 @@ export const jobTypes: JobType[] = [
     summary: 'On-site assessment and quote for replacing five or more panes / IG units.',
     includes: ['On-site assessment', 'Measurements for all panes', 'Written quote provided'],
     pricing: {
-      display: 'Free consultation'
+      display: 'Visit charge by area',
+      detail: 'The exact on-site visit charge for your address is shown before you submit.'
     },
     consultationFormat: 'on-site'
   },
@@ -202,17 +205,16 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: true,
     customerLabel: 'Hardware Service — Commercial',
     summary:
-      'Assessment and diagnostic for commercial window or door hardware. The $350 fee covers the first hour of work.',
+      'Assessment and diagnostic for commercial window or door hardware. The $145 service fee covers the first hour of work.',
     includes: [
       'Diagnostic and assessment',
       'First hour of labor',
       'Proposal for any additional parts or labor'
     ],
     pricing: {
-      display: '$350',
+      display: '$145 service fee',
       detail:
-        'Covers diagnostic + first hour. If we can’t offer a solution, only the $125 site assessment fee applies.',
-      rebate: 'Applied toward the repair'
+        'Covers diagnostic + first hour; the fee is separate from the cost of any work. If we can’t offer a solution, only the $125 site assessment fee applies.'
     },
     consultationFormat: 'on-site'
   },
@@ -225,17 +227,16 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: true,
     customerLabel: 'Hardware Service — Residential',
     summary:
-      'Assessment and diagnostic for residential window or door hardware. The $350 fee covers the first hour of work.',
+      'Assessment and diagnostic for residential window or door hardware. The $350 service fee covers the first hour of work.',
     includes: [
       'Diagnostic and assessment',
       'First hour of labor',
       'Proposal for any additional parts or labor'
     ],
     pricing: {
-      display: '$350',
+      display: '$350 service fee',
       detail:
-        'Covers diagnostic + first hour. If we can’t offer a solution, only the $125 site assessment fee applies.',
-      rebate: 'Applied toward the repair'
+        'Covers diagnostic + first hour; the fee is separate from the cost of any work. If we can’t offer a solution, only the $125 site assessment fee applies.'
     },
     consultationFormat: 'on-site'
   },
@@ -279,7 +280,10 @@ export const jobTypes: JobType[] = [
     summary:
       'On-site assessment and quote to replace 1–2 brand-new windows — frames and glass included (not glass-only).',
     includes: ['New window (frame + glass) assessment', 'Measurements', 'Written quote'],
-    pricing: { display: 'Free consultation' },
+    pricing: {
+      display: 'Visit charge by area',
+      detail: 'The exact on-site visit charge for your address is shown before you submit.'
+    },
     consultationFormat: 'on-site'
   },
   {
@@ -301,7 +305,10 @@ export const jobTypes: JobType[] = [
     summary:
       'On-site assessment and quote to replace 3 or more brand-new windows — frames and glass included (not glass-only).',
     includes: ['New window (frame + glass) assessment for each opening', 'Measurements', 'Written quote'],
-    pricing: { display: 'Free consultation' },
+    pricing: {
+      display: 'Visit charge by area',
+      detail: 'The exact on-site visit charge for your address is shown before you submit.'
+    },
     consultationFormat: 'on-site'
   },
   {

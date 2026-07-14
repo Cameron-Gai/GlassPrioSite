@@ -8,16 +8,8 @@
   export let photosRequired = false;
   export let showErrors = false;
 
-  // Arrival windows fit business hours (Mon–Sat, 8am–5pm). "No preference" maps
-  // to an empty stored value so it reads cleanly in the booking summary.
-  const arrivalWindows = [
-    'No preference',
-    'First available',
-    'Morning (8am–11am)',
-    'Midday (11am–2pm)',
-    'Afternoon (2pm–5pm)',
-    'Weekend'
-  ];
+  // The preferred arrival window used to live here; it moved to the scheduling
+  // step where the customer now picks a concrete day + window together.
 
   function update<K extends keyof SpecialInstructions>(field: K, raw: SpecialInstructions[K]) {
     intakeStore.updateSpecialInstructions({ [field]: raw } as Partial<SpecialInstructions>);
@@ -63,18 +55,6 @@
       />
       <span>There is a dog on the property</span>
     </label>
-    <div>
-      <label for="preferredWindow">Preferred appointment window</label>
-      <select
-        id="preferredWindow"
-        value={special.preferredWindow}
-        on:change={(event) => update('preferredWindow', event.currentTarget.value)}
-      >
-        {#each arrivalWindows as window (window)}
-          <option value={window === 'No preference' ? '' : window}>{window}</option>
-        {/each}
-      </select>
-    </div>
     <div>
       <label for="otherNotes">Anything else our team should know?</label>
       <textarea

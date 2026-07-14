@@ -7,14 +7,18 @@ export type PropertyType =
   | 'Other'
   | '';
 
-// "As soon as possible", "Today", and "Tomorrow" were intentionally removed:
-// urgency is funneled into the paid Priority Service upgrade offered on this same
-// step, so we no longer promise same-/next-day timing as a free scheduling choice.
-export type SchedulingPreference =
-  | 'This week'
-  | 'Next week'
-  | 'Flexible'
-  | '';
+/**
+ * The customer's requested service day:
+ *   ''         — not picked yet
+ *   'flexible' — first available / no preference
+ *   YYYY-MM-DD — a concrete calendar date picked from the next business days
+ * The arrival window (Morning/Midday/Afternoon) is stored separately in
+ * SpecialInstructions.preferredWindow. Both are advisory — the office confirms
+ * the real appointment — and the form says so.
+ * (Legacy values 'This week'/'Next week'/'Flexible' may exist in old drafts and
+ * are still understood by the server's booking-start derivation.)
+ */
+export type SchedulingPreference = string;
 
 /** Who the submitter is relative to the property (options depend on property type). */
 export type PropertyContactRole =
@@ -91,6 +95,9 @@ export interface CategoryDetails {
 }
 
 export interface UploadedPhoto {
+  /** Client-generated unique id — the list key and removal handle. (File names
+   *  collide: camera rolls hand every pick the same "image.jpg".) */
+  id: string;
   /** Original file name, for display + the booking summary. */
   name: string;
   /** Compressed JPEG as a data URL (data:image/jpeg;base64,...). */
@@ -142,6 +149,12 @@ export interface IntakePayload {
   /** True when the customer chose "Pay later" — book unpaid; GlassReports texts the
    *  OSC payment link once the booking is converted to a scheduled job. */
   payLater?: boolean;
+  /** The number the OSC payment link is texted to (pay-later only). Defaults to
+   *  the contact phone but the customer can point it at a different number. */
+  payLaterPhone?: string;
+  /** Explicit opt-in to receive the payment-link text. Pay-later is only honored
+   *  when this is true — without consent we can't collect the OSC by text. */
+  textConsent?: boolean;
   /** True when the customer opted into a remote (virtual) consultation instead of an
    *  on-site visit: the OSC is waived until we roll a truck, and a photo is required. */
   remoteConsult?: boolean;

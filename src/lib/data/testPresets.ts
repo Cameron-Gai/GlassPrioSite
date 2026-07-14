@@ -58,7 +58,9 @@ export const testPresets: IntakePreset[] = [
       happenedAt: 'Yesterday',
       isSecure: true
     },
-    schedulingPreference: 'This week'
+    // 'flexible' = first available (the day picker's non-date option); legacy
+    // phrases like 'This week' still parse server-side but aren't used anymore.
+    schedulingPreference: 'flexible'
   },
   {
     id: 'olympia-osc-175',
@@ -74,7 +76,7 @@ export const testPresets: IntakePreset[] = [
       happenedAt: 'Last week',
       isSecure: true
     },
-    schedulingPreference: 'Flexible'
+    schedulingPreference: 'flexible'
   },
   {
     id: 'tacoma-storefront',
@@ -90,7 +92,7 @@ export const testPresets: IntakePreset[] = [
       description: 'TEST submission — please disregard / delete. Storefront door + glass replacement.',
       categoryDetails: { storefrontScope: 'Full system', doorOperational: 'no' }
     },
-    schedulingPreference: 'Next week'
+    schedulingPreference: 'flexible'
   },
   {
     id: 'redmond-emergency',
@@ -124,6 +126,6 @@ export const testPresets: IntakePreset[] = [
       description: 'TEST submission — please disregard / delete. Frameless enclosure quote.',
       categoryDetails: { showerMirrorType: 'Frameless shower', approximateSize: '60in x 72in' }
     },
-    schedulingPreference: 'Flexible'
+    schedulingPreference: 'flexible'
   }
 ];

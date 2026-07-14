@@ -23,6 +23,8 @@ export interface BookingFeeContext {
   /** Customer chose "Pay later": the OSC is collected by a texted Stripe link once
    *  the booking is converted to a scheduled job (the GlassReports OSC pipeline). */
   deferred?: boolean;
+  /** Where the pay-later link is texted (may differ from the contact phone). */
+  payLaterPhone?: string | null;
   /** Customer opted into a remote (virtual) consultation: the OSC is waived until
    *  we roll a truck, so nothing is collected online and the booking notes say so. */
   remoteConsult?: boolean;
@@ -175,7 +177,8 @@ function feeLine(feeCtx?: BookingFeeContext): string | null {
       return `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}): $${total.toFixed(2)} collected${taxNote}. Do NOT collect again.`;
     }
     if (feeCtx.deferred) {
-      return `On-site consultation charge: $${feeCtx.osc}${zone} - customer chose PAY LATER. On conversion to a job, the "OSC Collection" tag is applied and a Stripe payment link is texted to collect before the appointment.`;
+      const to = feeCtx.payLaterPhone ? ` to ${feeCtx.payLaterPhone}` : '';
+      return `On-site consultation charge: $${feeCtx.osc}${zone} - customer chose PAY LATER (texting consent given). On conversion to a job, the "OSC Collection" tag is applied and a Stripe payment link is texted${to} to collect before the appointment.`;
     }
     return `On-site consultation charge: $${feeCtx.osc}${zone} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
   }
@@ -198,7 +201,10 @@ function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): 
       data.push({ key: 'stripe_payment_intent', value: feeCtx.paymentIntentId });
       if (feeCtx.paidTotal != null) data.push({ key: 'osc_paid_total', value: String(feeCtx.paidTotal) });
     }
-    if (feeCtx.deferred) data.push({ key: 'osc_paylater', value: 'true' });
+    if (feeCtx.deferred) {
+      data.push({ key: 'osc_paylater', value: 'true' });
+      if (feeCtx.payLaterPhone) data.push({ key: 'osc_paylater_phone', value: feeCtx.payLaterPhone });
+    }
     if (feeCtx.remoteConsult) data.push({ key: 'osc_remote_consult', value: 'true' });
   }
   // Returning-customer linkage — lets the CSR (or an integration) attach this
@@ -211,6 +217,17 @@ function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): 
     if (rc.locationId) data.push({ key: 'st_location_id', value: String(rc.locationId) });
   }
   return data.length ? data : undefined;
+}
+
+/** Human-readable timing line for the CSR. The preference is a concrete date
+ *  (YYYY-MM-DD from the day picker), 'flexible', or a legacy phrase. */
+function schedulingLine(pref: string): string | null {
+  if (!pref) return null;
+  if (pref === 'flexible' || pref === 'Flexible') return 'Customer timing: flexible - first available works.';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(pref)) {
+    return `Customer requested day: ${pref} (advisory - customer was told we will confirm, and reach out if it does not work)`;
+  }
+  return `Customer prefers: ${pref}`;
 }
 
 function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx?: BookingFeeContext): string {
@@ -303,9 +320,8 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   if (payload.issueDetails.hasWaterOrWeatherEntry) flags.push('Water / weather entering');
   if (flags.length) lines.push(`Site flags: ${flags.join(', ')}`);
 
-  if (payload.schedulingPreference) {
-    lines.push(`Customer prefers: ${payload.schedulingPreference}`);
-  }
+  const timing = schedulingLine(payload.schedulingPreference);
+  if (timing) lines.push(timing);
   if (photoUrls.length) {
     lines.push('');
     lines.push(`Customer photos (${photoUrls.length}):`);

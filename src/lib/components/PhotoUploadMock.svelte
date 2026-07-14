@@ -62,7 +62,8 @@
           continue;
         }
         const dataUrl = await compress(file);
-        intakeStore.addPhoto({ name: file.name, dataUrl });
+        // Unique id, not the file name — camera rolls hand every pick "image.jpg".
+        intakeStore.addPhoto({ id: crypto.randomUUID(), name: file.name, dataUrl });
       }
     } catch {
       errorMessage = 'One of those photos could not be processed. Try another.';
@@ -72,8 +73,8 @@
     }
   }
 
-  function remove(name: string) {
-    intakeStore.removePhoto(name);
+  function remove(id: string) {
+    intakeStore.removePhoto(id);
   }
 </script>
 
@@ -105,11 +106,11 @@
 
   {#if photos.length > 0}
     <ul class="list">
-      {#each photos as photo (photo.name)}
+      {#each photos as photo (photo.id)}
         <li>
           <img class="thumb" src={photo.dataUrl} alt={photo.name} />
           <span class="name" title={photo.name}>{photo.name}</span>
-          <button type="button" class="remove" on:click={() => remove(photo.name)}>Remove</button>
+          <button type="button" class="remove" on:click={() => remove(photo.id)}>Remove</button>
         </li>
       {/each}
     </ul>

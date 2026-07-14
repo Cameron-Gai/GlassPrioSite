@@ -59,11 +59,31 @@ function windowStartTime(preferredWindow: string): [number, number] {
  * Earliest slot consistent with the customer's scheduling preference and
  * preferred arrival window, as an RFC3339 UTC string. Undefined when the
  * customer expressed no timing preference at all.
+ *
+ * `schedulingPreference` is either a concrete requested date (YYYY-MM-DD, from
+ * the day picker), 'flexible', or a legacy phrase ('This week' / 'Next week' /
+ * 'Flexible') from an old draft.
  */
 export function buildBookingStart(schedulingPreference: string, preferredWindow: string, now: Date = new Date()): string | undefined {
   if (!schedulingPreference && !preferredWindow) return undefined;
 
   const today = pacificParts(now);
+
+  // Concrete requested date: use it directly (with the window's start time),
+  // unless it's already in the past — a stale draft — in which case fall through
+  // to the first-available derivation below.
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(schedulingPreference);
+  if (dateMatch) {
+    const [, y, m, d] = dateMatch;
+    const requested = Date.UTC(Number(y), Number(m) - 1, Number(d));
+    const todayUtc = Date.UTC(today.year, today.month - 1, today.day);
+    if (requested > todayUtc) {
+      const [hour, minute] = windowStartTime(preferredWindow);
+      return pacificToUtc(Number(y), Number(m), Number(d), hour, minute).toISOString();
+    }
+    schedulingPreference = 'flexible';
+  }
+  if (schedulingPreference === 'flexible') schedulingPreference = 'Flexible';
   // Anchor date arithmetic on the Pacific calendar date at UTC midnight, so
   // getUTCDay() below is the Pacific weekday and DST can't skew day steps.
   const base = Date.UTC(today.year, today.month - 1, today.day);

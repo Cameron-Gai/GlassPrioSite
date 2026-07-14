@@ -101,8 +101,18 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior, remoteConsult);
   // Customer chose "Pay later" at the charge step: book unpaid and hand the OSC to
   // GlassReports, which texts a Stripe link once the booking converts to a job.
-  // (Remote-consult takes precedence — there's no charge to defer.)
-  const deferred = feeDue && !remoteConsult && payload.payLater === true;
+  // (Remote-consult takes precedence — there's no charge to defer.) Texting
+  // consent is REQUIRED for pay-later: the collection channel IS the text, so
+  // without consent the UI blocks the option; if a payload claims pay-later
+  // without consent anyway, book it as ordinary office-collects instead.
+  const deferred =
+    feeDue && !remoteConsult && payload.payLater === true && payload.textConsent === true;
+  if (feeDue && !remoteConsult && payload.payLater === true && payload.textConsent !== true) {
+    console.warn('[api/intake] pay-later requested without texting consent — treating as office-collects');
+  }
+  const payLaterPhone = deferred
+    ? (payload.payLaterPhone ?? '').trim() || payload.customer.phone.trim()
+    : null;
 
   // Online collection is BEST-EFFORT and must never block a lead. If the customer
   // authorized a card hold at review, verify it (amount taken from the zone map —
@@ -150,6 +160,12 @@ export const POST: RequestHandler = async ({ request, url }) => {
       osc: fee.osc,
       zip: payload.address.zip
     });
+  } else if (feeDue && deferred) {
+    console.log('[api/intake] pay-later with texting consent — booking unpaid; link texted on conversion', {
+      osc: fee.osc,
+      zip: payload.address.zip,
+      textTo: payLaterPhone
+    });
   } else if (feeDue) {
     // OSC due but nothing was authorized online — book unpaid; the office collects
     // at scheduling. (Mirrors the "we'll collect when scheduling" message the
@@ -171,6 +187,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     flag: fee.flag,
     businessUnitId,
     deferred,
+    payLaterPhone,
     remoteConsult
   };
 
@@ -292,7 +309,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
       jobTypeId: fee.jobTypeId,
       jobTypeName: payload.selectedJobType.name,
       customerName: `${payload.customer.firstName} ${payload.customer.lastName}`.trim(),
-      phone: payload.customer.phone
+      // The customer's chosen pay-by-text number — may differ from the contact phone.
+      phone: payLaterPhone ?? payload.customer.phone
     });
   }
 

@@ -51,7 +51,7 @@
       <h1>Tell us what you need.<br /><span class="muted">We’ll route it the right way.</span></h1>
       <p class="lede">
         A few quick questions are all it takes. Emergencies are dispatched the same day; everything
-        else heads to a free consultation.
+        else starts with a consultation and a written quote.
       </p>
       <ul class="trust">
         <li>
@@ -64,7 +64,7 @@
         </li>
         <li>
           <span class="trust-dot" aria-hidden="true"></span>
-          <span>Free quotes on most consults</span>
+          <span>Upfront pricing — see any visit charge before you book</span>
         </li>
       </ul>
     </section>

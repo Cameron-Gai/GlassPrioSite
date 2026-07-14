@@ -49,7 +49,7 @@
       ];
     }
     return [
-      'A team member will follow up to confirm your consultation appointment',
+      "A team member will follow up to confirm your consultation appointment — if your requested time doesn't work, we'll reach out to find one that does",
       'The consultant will assess the work, take measurements, and provide a written quote',
       'If you accept the quote, we schedule the installation visit'
     ];
@@ -112,7 +112,9 @@
         {:else if state.remoteConsult}
           <span class="later">Waived — remote consultation first</span>
         {:else if state.payLater}
-          <span class="later">We'll text you a link before your appointment</span>
+          <span class="later">
+            Payment link will be texted to {state.payLaterPhone || state.customer.phone || 'you'}
+          </span>
         {:else}
           <span class="later">Collected at scheduling</span>
         {/if}

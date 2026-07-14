@@ -48,7 +48,7 @@
         type="text"
         maxlength="2"
         autocomplete="address-level1"
-        placeholder="TX"
+        placeholder="WA"
         value={value.state}
         on:input={(event) => update('state', event.currentTarget.value.toUpperCase())}
       />
@@ -62,7 +62,7 @@
       type="text"
       inputmode="numeric"
       autocomplete="postal-code"
-      placeholder="78701"
+      placeholder="98101"
       value={value.zip}
       on:input={(event) => update('zip', event.currentTarget.value)}
     />

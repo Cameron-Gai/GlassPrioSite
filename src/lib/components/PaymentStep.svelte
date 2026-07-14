@@ -19,6 +19,22 @@
   /** Remote-consultation opt-in: waive the on-site charge, require a photo. */
   let showRemote = false;
   let remoteError = '';
+  /** Pay-later panel: needs an explicit texting consent (the text IS the
+   *  collection channel) and lets the customer point the link at a different
+   *  number than their contact phone. */
+  let showPayLater = false;
+  let payPhone = '';
+  let payConsent = false;
+  let payLaterError = '';
+  const PHONE_OK = /^[0-9+\-\s().]{7,}$/;
+
+  function togglePayLater() {
+    showPayLater = !showPayLater;
+    if (showPayLater && !payPhone.trim()) {
+      // Autofill from the contact phone; the customer can overwrite it.
+      payPhone = state.payLaterPhone || state.customer.phone;
+    }
+  }
   /** Operator-facing diagnostic. Only rendered when the server reports
    *  debug mode (PAYMENT_DEBUG=true), so customers never see internals. */
   let diagnostic = '';
@@ -165,10 +181,22 @@
 
   /** "Pay later by text": submit unpaid. GlassReports texts the OSC payment link
    *  once the office converts the booking to a scheduled job. We never confirm the
-   *  card here, so no hold is placed; the created intent simply expires unused. */
+   *  card here, so no hold is placed; the created intent simply expires unused.
+   *  Requires the texting consent — without it there's no way to collect. */
   async function payLaterAndSubmit() {
+    if (!payConsent) {
+      payLaterError =
+        'Please check the consent box first — texting is how we collect this charge, so we need your OK.';
+      return;
+    }
+    if (!PHONE_OK.test(payPhone.trim())) {
+      payLaterError = 'Enter a valid mobile number for the payment link.';
+      return;
+    }
+    payLaterError = '';
     phase = 'submitting';
     payError = '';
+    intakeStore.setPayLaterInfo({ phone: payPhone.trim(), consent: true });
     intakeStore.setPayLater(true);
     const ok = await intakeStore.submit();
     if (!ok) {
@@ -233,14 +261,50 @@
     </button>
 
     <div class="later-row">
-      <button type="button" class="later-btn" on:click={payLaterAndSubmit} disabled={phase === 'submitting'}>
+      <button
+        type="button"
+        class="later-btn"
+        aria-expanded={showPayLater}
+        on:click={togglePayLater}
+        disabled={phase === 'submitting'}
+      >
         Pay later — text me the link
       </button>
-      <p class="muted small later-note">
-        We'll submit your request now and text a secure payment link
-        {#if state.customer.phone}to {state.customer.phone}{/if}
-        once your appointment is scheduled. The {money(amount)} is collected before we arrive.
-      </p>
+      {#if showPayLater}
+        <p class="muted small later-note">
+          We'll submit your request now and text a secure payment link once your appointment is
+          scheduled. The {money(amount)} is collected before we arrive.
+        </p>
+        <div class="pay-phone">
+          <label for="payPhone">Text the payment link to</label>
+          <input
+            id="payPhone"
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel"
+            placeholder="(206) 555-1234"
+            bind:value={payPhone}
+            disabled={phase === 'submitting'}
+          />
+        </div>
+        <label class="consent">
+          <input type="checkbox" bind:checked={payConsent} disabled={phase === 'submitting'} />
+          <span>
+            I agree to receive a text with a secure payment link at this number.
+            <strong>This is how the {money(amount)} charge is collected, so pay-later needs this
+            consent.</strong> Message and data rates may apply.
+          </span>
+        </label>
+        {#if payLaterError}<p class="pay-error">{payLaterError}</p>{/if}
+        <button
+          type="button"
+          class="remote-submit"
+          on:click={payLaterAndSubmit}
+          disabled={phase === 'submitting' || !payConsent}
+        >
+          Submit request — text me the payment link
+        </button>
+      {/if}
     </div>
 
     <div class="remote-row">
@@ -361,6 +425,35 @@
     margin-top: 0.4rem;
     padding-top: 0.7rem;
     border-top: 1px solid var(--color-border);
+  }
+
+  .pay-phone {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: 0.3rem;
+    max-width: 280px;
+  }
+
+  .pay-phone label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .consent {
+    display: flex;
+    gap: 0.55rem;
+    align-items: flex-start;
+    margin-top: 0.45rem;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--color-text);
+  }
+
+  .consent input {
+    width: auto;
+    margin: 0.15rem 0 0;
+    flex-shrink: 0;
   }
 
   .later-btn {

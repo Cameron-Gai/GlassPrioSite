@@ -76,6 +76,11 @@ export interface IntakeState {
   /** Customer chose "Pay later" at the charge step — book unpaid; OSC is collected
    *  by a texted payment link once the job is scheduled (GlassReports pipeline). */
   payLater: boolean;
+  /** Where the pay-later payment link is texted. Defaults to the contact phone;
+   *  the customer can overwrite it on the pay-later panel. */
+  payLaterPhone: string;
+  /** Explicit opt-in to the payment-link text — required to book pay-later. */
+  textConsent: boolean;
   /** Customer opted into a remote (virtual) consultation instead of an on-site visit:
    *  the OSC is waived until we roll a truck, and a photo is required. */
   remoteConsult: boolean;
@@ -119,6 +124,27 @@ export const STEP_ORDER: WizardStep[] = [
   'review',
   'confirmation'
 ];
+
+/**
+ * Emergency fast-track: someone with glass on the floor shouldn't fill out a
+ * 9-step form. Issue/site details become optional (photos can be added on the
+ * review screen) and scheduling is skipped entirely — dispatch is immediate, so
+ * there's no window to pick. Property type stays: it's one tap and it drives
+ * the business-unit routing.
+ */
+export const EMERGENCY_STEP_ORDER: WizardStep[] = [
+  'triage',
+  'property-type',
+  'address',
+  'contact',
+  'review',
+  'confirmation'
+];
+
+/** The step sequence in effect for this request. */
+export function stepsFor(state: Pick<IntakeState, 'isEmergency'>): WizardStep[] {
+  return state.isEmergency ? EMERGENCY_STEP_ORDER : STEP_ORDER;
+}
 
 export interface PhaseDef {
   id: string;
@@ -179,6 +205,8 @@ function initialState(): IntakeState {
     paymentIntentId: null,
     paymentAuthorized: false,
     payLater: false,
+    payLaterPhone: '',
+    textConsent: false,
     remoteConsult: false,
     confirmationNumber: null,
     submitting: false,
@@ -232,7 +260,10 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
       ...saved.issueDetails,
       windowAccess: { ...base.issueDetails.windowAccess, ...saved.issueDetails?.windowAccess },
       categoryDetails: { ...base.issueDetails.categoryDetails, ...saved.issueDetails?.categoryDetails },
-      photos: Array.isArray(saved.issueDetails?.photos) ? saved.issueDetails.photos : []
+      // Drafts saved before photos carried ids get them backfilled here.
+      photos: Array.isArray(saved.issueDetails?.photos)
+        ? saved.issueDetails.photos.map((p) => ({ ...p, id: p.id || crypto.randomUUID() }))
+        : []
     },
     specialInstructions: { ...base.specialInstructions, ...saved.specialInstructions },
     // Time-sensitive / transient — never trust these across a reload.
@@ -240,12 +271,16 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
     paymentIntentId: null,
     paymentAuthorized: false,
     payLater: false,
+    payLaterPhone: '',
+    textConsent: false,
     remoteConsult: false,
     submitting: false,
     submitError: null,
     returning: { status: 'idle', firstName: null, customerId: null, locationId: null }
   };
-  if (!STEP_ORDER.includes(merged.step)) merged.step = 'triage';
+  // Guard against a step that isn't in this request's sequence (e.g. a draft
+  // saved on the issue/site step before the emergency fast-track existed).
+  if (!stepsFor(merged).includes(merged.step)) merged.step = 'triage';
   // The fee/payment state is dropped above, so the review step would be stale —
   // step back to contact so it re-resolves cleanly.
   if (merged.step === 'review') merged.step = 'contact';
@@ -390,9 +425,10 @@ function createIntakeStore() {
 
   function advance() {
     store.update((state) => {
-      const idx = STEP_ORDER.indexOf(state.step);
-      if (idx < 0 || idx + 1 >= STEP_ORDER.length) return state;
-      return { ...state, step: STEP_ORDER[idx + 1] };
+      const order = stepsFor(state);
+      const idx = order.indexOf(state.step);
+      if (idx < 0 || idx + 1 >= order.length) return state;
+      return { ...state, step: order[idx + 1] };
     });
   }
 
@@ -411,8 +447,9 @@ function createIntakeStore() {
         };
       }
 
-      const idx = STEP_ORDER.indexOf(state.step);
-      const candidate = STEP_ORDER[idx - 1];
+      const order = stepsFor(state);
+      const idx = order.indexOf(state.step);
+      const candidate = order[idx - 1];
       if (candidate === 'triage') {
         // Re-enter triage at the last decision; drop the route.
         const previous = state.triageHistory[state.triageHistory.length - 1] ?? TRIAGE_ROOT_ID;
@@ -605,6 +642,15 @@ function createIntakeStore() {
     store.update((state) => ({ ...state, payLater: value, remoteConsult: value ? false : state.remoteConsult }));
   }
 
+  /** The pay-later text destination + the explicit texting consent that gates it. */
+  function setPayLaterInfo(patch: { phone?: string; consent?: boolean }) {
+    store.update((state) => ({
+      ...state,
+      payLaterPhone: patch.phone !== undefined ? patch.phone : state.payLaterPhone,
+      textConsent: patch.consent !== undefined ? patch.consent : state.textConsent
+    }));
+  }
+
   /** Customer opted into a remote consultation — waive the OSC (until we roll a
    *  truck); a photo is required before submit. */
   function setRemoteConsult(value: boolean) {
@@ -612,12 +658,14 @@ function createIntakeStore() {
   }
 
   function resetPayment() {
+    // payLaterPhone survives on purpose — it's customer data, not payment state.
     store.update((state) => ({
       ...state,
       feeQuote: null,
       paymentIntentId: null,
       paymentAuthorized: false,
       payLater: false,
+      textConsent: false,
       remoteConsult: false
     }));
   }
@@ -684,12 +732,12 @@ function createIntakeStore() {
     }));
   }
 
-  function removePhoto(name: string) {
+  function removePhoto(id: string) {
     store.update((state) => ({
       ...state,
       issueDetails: {
         ...state.issueDetails,
-        photos: state.issueDetails.photos.filter((photo) => photo.name !== name)
+        photos: state.issueDetails.photos.filter((photo) => photo.id !== id)
       }
     }));
   }
@@ -734,6 +782,8 @@ function createIntakeStore() {
       schedulingPreference: state.schedulingPreference,
       paymentIntentId: state.paymentAuthorized ? state.paymentIntentId : null,
       payLater: state.payLater,
+      payLaterPhone: state.payLater ? state.payLaterPhone.trim() || state.customer.phone.trim() : '',
+      textConsent: state.textConsent,
       remoteConsult: state.remoteConsult,
       returningCustomer: {
         matched: state.returning.status === 'applied',
@@ -844,6 +894,7 @@ function createIntakeStore() {
     setFeeQuote,
     setPaymentAuthorized,
     setPayLater,
+    setPayLaterInfo,
     setRemoteConsult,
     resetPayment,
     setPropertyType,
