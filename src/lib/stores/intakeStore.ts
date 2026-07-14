@@ -6,6 +6,7 @@ import {
   TRIAGE_ROOT_ID,
   getNode,
   resolveRoute,
+  triageTree,
   type TriageNode,
   type TriageOption
 } from '$lib/triage/triageTree';
@@ -290,6 +291,14 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
     returnToReview: false,
     returning: { status: 'idle', firstName: null, customerId: null, locationId: null }
   };
+  // Heal triage state saved under an older tree (e.g. the removed 'emergency'
+  // root node): an unknown node id must never reach getNode — it throws during
+  // hydration and leaves the fully-rendered page unresponsive.
+  if (!triageTree[merged.currentNodeId]) merged.currentNodeId = TRIAGE_ROOT_ID;
+  merged.triageHistory = merged.triageHistory.filter((id) => !!triageTree[id]);
+  merged.answers = Object.fromEntries(
+    Object.entries(merged.answers).filter(([id]) => !!triageTree[id])
+  );
   // Guard against a step that isn't in this request's sequence (e.g. a draft
   // saved on the issue/site step before the emergency fast-track existed).
   if (!stepsFor(merged).includes(merged.step)) merged.step = 'triage';
@@ -958,7 +967,10 @@ export const intakeStore = createIntakeStore();
 
 export const currentTriageNode = derived(intakeStore, ($state): TriageNode | null => {
   if ($state.step !== 'triage') return null;
-  return getNode($state.currentNodeId);
+  // Never throw from a derived — a subscriber exception during hydration kills
+  // every event handler on the page. An unknown id (old draft, renamed node)
+  // falls back to the root question instead.
+  return triageTree[$state.currentNodeId] ?? getNode(TRIAGE_ROOT_ID);
 });
 
 export const currentPhaseIndex = derived(intakeStore, ($state) =>
