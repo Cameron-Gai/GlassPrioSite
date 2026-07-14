@@ -29,6 +29,16 @@
 
   $: details = value.categoryDetails;
 
+  // Progressive disclosure: the description is the hero; the typed secondary
+  // fields (where / when / window access) live behind "Add more detail".
+  // Auto-open when any of them already hold values (draft restore, back
+  // navigation, edit-from-review) so nothing ever looks lost.
+  let showMore =
+    value.serviceLocation.trim() !== '' ||
+    value.happenedAt.trim() !== '' ||
+    value.windowAccess.floors.trim() !== '' ||
+    value.windowAccess.blocked !== 'no';
+
   $: locationPlaceholder = (() => {
     switch (category) {
       case 'storefront-door':
@@ -66,6 +76,22 @@
 </script>
 
 <div class="grid">
+  <!-- Hero: the one field that matters most. Everything on this step is optional. -->
+  <div>
+    <label for="description">Describe the issue</label>
+    <textarea
+      id="description"
+      class="hero"
+      rows="4"
+      placeholder={descriptionPrompt}
+      value={value.description}
+      on:input={(event) => update('description', event.currentTarget.value)}
+    ></textarea>
+    <p class="hint">
+      Details help us send the right person with the right materials.
+    </p>
+  </div>
+
   <!-- Category-specific scope (storefront / shower-mirror / multi / hardware) -->
   {#if category === 'storefront-door'}
     <fieldset class="block">
@@ -162,91 +188,7 @@
     </fieldset>
   {/if}
 
-  <!-- Standard intake -->
-  <p class="nudge">
-    The more you can share, the faster we can help — details and photos let us send the right person
-    with the right materials. None of the fields below are required.
-  </p>
-
-  <div>
-    <label for="serviceLocation">Where is the issue?</label>
-    <input
-      id="serviceLocation"
-      type="text"
-      placeholder={locationPlaceholder}
-      value={value.serviceLocation}
-      on:input={(event) => update('serviceLocation', event.currentTarget.value)}
-    />
-  </div>
-
-  <div>
-    <label for="description">Tell us more</label>
-    <textarea
-      id="description"
-      rows="3"
-      placeholder={descriptionPrompt}
-      value={value.description}
-      on:input={(event) => update('description', event.currentTarget.value)}
-    ></textarea>
-  </div>
-
-  <div>
-    <label for="happenedAt">When did this happen?</label>
-    <input
-      id="happenedAt"
-      type="text"
-      placeholder="Today around 2pm, last night, last week..."
-      value={value.happenedAt}
-      on:input={(event) => update('happenedAt', event.currentTarget.value)}
-    />
-  </div>
-
-  <fieldset class="block">
-    <legend>Window location &amp; access</legend>
-    <div>
-      <label for="floors">What floor(s) is the window on?</label>
-      <input
-        id="floors"
-        type="text"
-        placeholder="e.g. ground floor, 2nd story, floors 3–4"
-        value={value.windowAccess.floors}
-        on:input={(event) => updateWindowAccess('floors', event.currentTarget.value)}
-      />
-    </div>
-    <div>
-      <span class="pseudo-label">Is there anything blocking access to it/them?</span>
-      <div class="segmented" role="radiogroup" aria-label="Anything blocking access">
-        {#each blockedOptions as opt (opt.value)}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={value.windowAccess.blocked === opt.value}
-            class:active={value.windowAccess.blocked === opt.value}
-            on:click={() => updateWindowAccess('blocked', opt.value)}
-          >
-            {opt.label}
-          </button>
-        {/each}
-      </div>
-    </div>
-    {#if value.windowAccess.blocked === 'yes'}
-      <div>
-        <label for="blockedNotes">What's blocking access?</label>
-        <input
-          id="blockedNotes"
-          type="text"
-          placeholder="e.g. landscaping, furniture, locked gate, parked vehicles"
-          value={value.windowAccess.blockedNotes}
-          on:input={(event) => updateWindowAccess('blockedNotes', event.currentTarget.value)}
-        />
-      </div>
-    {:else if value.windowAccess.blocked === 'unsure'}
-      <p class="legend-help">
-        No problem — a photo of the area helps our team plan access. You can add one on the next step.
-      </p>
-    {/if}
-  </fieldset>
-
+  <!-- Tap-only safety flags stay visible — they matter for dispatch. -->
   <fieldset class="block">
     <legend>Site conditions</legend>
     <label class="check">
@@ -274,6 +216,98 @@
       <span>Water or weather is entering the property</span>
     </label>
   </fieldset>
+
+  <!-- Everything typed-and-optional folds away here. -->
+  <div class="more">
+    <button
+      type="button"
+      class="more-toggle"
+      aria-expanded={showMore}
+      on:click={() => (showMore = !showMore)}
+    >
+      <span class="more-chev" aria-hidden="true" data-open={showMore}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </span>
+      <span class="more-label">
+        {showMore ? 'Hide extra detail' : 'Add more detail'}
+        <span class="more-sub">where it is, when it happened, window access — all optional</span>
+      </span>
+    </button>
+
+    {#if showMore}
+      <div class="more-body fade-in">
+        <div>
+          <label for="serviceLocation">Where is the issue?</label>
+          <input
+            id="serviceLocation"
+            type="text"
+            placeholder={locationPlaceholder}
+            value={value.serviceLocation}
+            on:input={(event) => update('serviceLocation', event.currentTarget.value)}
+          />
+        </div>
+
+        <div>
+          <label for="happenedAt">When did this happen?</label>
+          <input
+            id="happenedAt"
+            type="text"
+            placeholder="Today around 2pm, last night, last week..."
+            value={value.happenedAt}
+            on:input={(event) => update('happenedAt', event.currentTarget.value)}
+          />
+        </div>
+
+        <fieldset class="block">
+          <legend>Window location &amp; access</legend>
+          <div>
+            <label for="floors">What floor(s) is the window on?</label>
+            <input
+              id="floors"
+              type="text"
+              placeholder="e.g. ground floor, 2nd story, floors 3–4"
+              value={value.windowAccess.floors}
+              on:input={(event) => updateWindowAccess('floors', event.currentTarget.value)}
+            />
+          </div>
+          <div>
+            <span class="pseudo-label">Is there anything blocking access to it/them?</span>
+            <div class="segmented" role="radiogroup" aria-label="Anything blocking access">
+              {#each blockedOptions as opt (opt.value)}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={value.windowAccess.blocked === opt.value}
+                  class:active={value.windowAccess.blocked === opt.value}
+                  on:click={() => updateWindowAccess('blocked', opt.value)}
+                >
+                  {opt.label}
+                </button>
+              {/each}
+            </div>
+          </div>
+          {#if value.windowAccess.blocked === 'yes'}
+            <div>
+              <label for="blockedNotes">What's blocking access?</label>
+              <input
+                id="blockedNotes"
+                type="text"
+                placeholder="e.g. landscaping, furniture, locked gate, parked vehicles"
+                value={value.windowAccess.blockedNotes}
+                on:input={(event) => updateWindowAccess('blockedNotes', event.currentTarget.value)}
+              />
+            </div>
+          {:else if value.windowAccess.blocked === 'unsure'}
+            <p class="legend-help">
+              No problem — a photo of the area helps our team plan access. You can add one on the next step.
+            </p>
+          {/if}
+        </fieldset>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -285,6 +319,17 @@
   textarea {
     resize: vertical;
     min-height: 96px;
+  }
+
+  textarea.hero {
+    min-height: 120px;
+  }
+
+  .hint {
+    margin: 0.4rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.86rem;
+    line-height: 1.45;
   }
 
   fieldset.block {
@@ -354,14 +399,59 @@
     margin: 0;
   }
 
-  .nudge {
-    margin: 0;
-    padding: 0.7rem 0.85rem;
-    background: var(--color-primary-soft);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    font-size: 0.9rem;
-    line-height: 1.5;
+  .more {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .more-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    text-align: left;
+    padding: 0.75rem 0.9rem;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-tint);
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  }
+
+  .more-toggle:hover {
+    border-color: var(--color-primary);
+  }
+
+  .more-toggle:active {
+    transform: scale(0.99);
+  }
+
+  .more-chev {
+    display: inline-flex;
+    color: var(--color-primary);
+    margin-top: 0.15rem;
+    transition: transform 0.18s ease;
+  }
+
+  .more-chev[data-open='true'] {
+    transform: rotate(90deg);
+  }
+
+  .more-label {
+    display: grid;
+    gap: 0.1rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    font-size: 0.95rem;
+  }
+
+  .more-sub {
+    font-weight: 500;
+    font-size: 0.82rem;
+    color: var(--color-muted);
+  }
+
+  .more-body {
+    display: grid;
+    gap: 1.05rem;
   }
 
   .virtual-note {

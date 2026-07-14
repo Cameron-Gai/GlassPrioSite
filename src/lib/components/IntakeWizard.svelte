@@ -323,7 +323,7 @@
     {:else if state.step === 'issue'}
       <header class="screen-head">
         <h2>Tell us what's going on</h2>
-        <p>Be as specific as you can — it helps us route the right person.</p>
+        <p>A sentence or two is plenty — everything on this step is optional.</p>
       </header>
       <IssueDetailsForm value={state.issueDetails} job={state.selectedJobType} />
     {:else if state.step === 'site'}
