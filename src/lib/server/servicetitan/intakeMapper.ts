@@ -136,10 +136,12 @@ function buildContacts(payload: IntakePayload): STBookingContact[] {
   return contacts;
 }
 
-/** Map a property type to the ServiceTitan customer type. Business & multi-family are Commercial. */
+/** Map a property type to the ServiceTitan customer type. Business, multi-family,
+ *  and facility-maintenance callers are Commercial. */
 export function customerTypeForPropertyType(propertyType: IntakePayload['propertyType']): 'Residential' | 'Commercial' {
   if (propertyType === 'Business') return 'Commercial';
   if (propertyType === 'Multi-family') return 'Commercial';
+  if (propertyType === 'Facility maintenance') return 'Commercial';
   return 'Residential';
 }
 
@@ -207,6 +209,16 @@ function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): 
     }
     if (feeCtx.remoteConsult) data.push({ key: 'osc_remote_consult', value: 'true' });
   }
+  // Facility-maintenance linkage: the work order is what the job bills against.
+  if (payload.propertyType === 'Facility maintenance') {
+    data.push({ key: 'facility_maintenance', value: 'true' });
+    if (payload.propertyDetails.facilityCompany) {
+      data.push({ key: 'fm_company', value: payload.propertyDetails.facilityCompany });
+    }
+    if (payload.propertyDetails.workOrderNumber) {
+      data.push({ key: 'work_order', value: payload.propertyDetails.workOrderNumber });
+    }
+  }
   // Returning-customer linkage — lets the CSR (or an integration) attach this
   // booking to the existing ServiceTitan record deterministically at conversion,
   // instead of relying only on ServiceTitan's native dedupe.
@@ -263,7 +275,21 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
     lines.push('Customer accepted the Priority Service upgrade ($399).');
   }
   // Property type + type-specific details and the submitter's role.
-  if (payload.propertyType) {
+  if (payload.propertyType === 'Facility maintenance') {
+    // Third-party caller: mirrors the GoSameDay phone-script booking note so
+    // the CSR handles it the same way regardless of channel. Contact goes to
+    // the FM company (the submitter), not the business being serviced.
+    const pd = payload.propertyDetails;
+    lines.push(
+      `THIRD-PARTY FACILITY MAINTENANCE - ${pd.facilityCompany || 'company name not given'} on behalf of ${pd.businessName || 'business name not given'}.`
+    );
+    lines.push(
+      pd.workOrderNumber
+        ? `Work order: ${pd.workOrderNumber} - job bills against this work order.`
+        : 'Work order number PENDING - confirm with the caller before billing.'
+    );
+    lines.push('Contact/confirmations go to the facility maintenance caller, not the business.');
+  } else if (payload.propertyType) {
     const pd = payload.propertyDetails;
     const name = payload.propertyType === 'Business' ? pd.businessName
       : payload.propertyType === 'Multi-family' ? pd.complexName : '';

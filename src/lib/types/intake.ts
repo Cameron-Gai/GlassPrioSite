@@ -4,8 +4,24 @@ export type PropertyType =
   | 'Residential'
   | 'Business'
   | 'Multi-family'
+  | 'Facility maintenance'
   | 'Other'
   | '';
+
+/** Customer-facing labels. Stored values stay stable ('Multi-family' predates
+ *  the "Apartments/Multifamily" label) so old drafts and the ServiceTitan
+ *  mapping never break. */
+export const PROPERTY_TYPE_LABELS: Record<Exclude<PropertyType, ''>, string> = {
+  Residential: 'Residential',
+  Business: 'Business',
+  'Multi-family': 'Apartments/Multifamily',
+  'Facility maintenance': 'Facility maintenance company',
+  Other: 'Other'
+};
+
+export function propertyTypeLabel(t: PropertyType): string {
+  return t ? PROPERTY_TYPE_LABELS[t] : '';
+}
 
 /**
  * The customer's requested service day:
@@ -31,12 +47,19 @@ export type PropertyContactRole =
 
 /** Property-type-specific details collected on the property-type step. */
 export interface PropertyDetails {
-  /** Business / company name (when property type is Business). */
+  /** Business / company name (when property type is Business), or the business
+   *  being serviced (when property type is Facility maintenance). */
   businessName: string;
   /** Apartment or complex name (when property type is Multi-family). */
   complexName: string;
   /** The submitter's role at the property. */
   role: PropertyContactRole;
+  /** Facility maintenance only: the maintenance company's own name (they call
+   *  on behalf of businessName). Mirrors the GoSameDay phone-script questions. */
+  facilityCompany: string;
+  /** Facility maintenance only: the work order the job bills against. Optional —
+   *  blank means "pending; confirm with the caller". */
+  workOrderNumber: string;
 }
 
 /** The person who'll be at the property, when different from the requester. */

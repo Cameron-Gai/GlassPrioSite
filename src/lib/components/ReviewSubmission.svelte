@@ -4,6 +4,7 @@
   import PhotoUploadMock from './PhotoUploadMock.svelte';
   import { intakeStore, type IntakeState, type WizardStep } from '$lib/stores/intakeStore';
   import { describeTiming } from '$lib/utils/timing';
+  import { propertyTypeLabel } from '$lib/types/intake';
 
   export let state: IntakeState;
 
@@ -79,7 +80,7 @@
       <div>
         <dt>Property type</dt>
         <dd>
-          {state.propertyType || '—'}
+          {propertyTypeLabel(state.propertyType) || '—'}
           {#if !state.isEmergency}
             <button type="button" class="edit inline" on:click={() => edit('property-type')}>
               change
@@ -92,6 +93,14 @@
       {/if}
       {#if state.propertyType === 'Multi-family' && state.propertyDetails.complexName}
         <div><dt>Community</dt><dd>{state.propertyDetails.complexName}</dd></div>
+      {/if}
+      {#if state.propertyType === 'Facility maintenance'}
+        <div><dt>Servicing</dt><dd>{state.propertyDetails.businessName || '—'}</dd></div>
+        <div><dt>Maintenance co.</dt><dd>{state.propertyDetails.facilityCompany || '—'}</dd></div>
+        <div>
+          <dt>Work order</dt>
+          <dd>{state.propertyDetails.workOrderNumber || 'Pending — we’ll confirm with you'}</dd>
+        </div>
       {/if}
       {#if state.propertyDetails.role}
         <div><dt>Your role</dt><dd>{state.propertyDetails.role}</dd></div>

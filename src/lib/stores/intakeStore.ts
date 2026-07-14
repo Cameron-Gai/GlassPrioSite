@@ -182,7 +182,7 @@ function initialState(): IntakeState {
     // State prefills to WA — virtually every customer is local (editable).
     address: { street: '', city: '', state: 'WA', zip: '' },
     propertyType: '',
-    propertyDetails: { businessName: '', complexName: '', role: '' },
+    propertyDetails: { businessName: '', complexName: '', role: '', facilityCompany: '', workOrderNumber: '' },
     onSiteContact: { differs: false, name: '', phone: '' },
     issueDetails: {
       serviceLocation: '',
@@ -718,11 +718,11 @@ function createIntakeStore() {
 
   function setPropertyType(value: PropertyType) {
     // Switching type clears the type-specific details so a stale business/
-    // complex name or role can't carry over.
+    // complex name, role, or work order can't carry over.
     store.update((state) => ({
       ...state,
       propertyType: value,
-      propertyDetails: { businessName: '', complexName: '', role: '' }
+      propertyDetails: { businessName: '', complexName: '', role: '', facilityCompany: '', workOrderNumber: '' }
     }));
   }
 

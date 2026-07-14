@@ -1,10 +1,20 @@
 <script lang="ts">
   import { intakeStore } from '$lib/stores/intakeStore';
-  import type { PropertyType, PropertyContactRole } from '$lib/types/intake';
+  import {
+    PROPERTY_TYPE_LABELS,
+    type PropertyType,
+    type PropertyContactRole
+  } from '$lib/types/intake';
 
   export let value: PropertyType;
 
-  const options: PropertyType[] = ['Residential', 'Business', 'Multi-family', 'Other'];
+  const options: Exclude<PropertyType, ''>[] = [
+    'Residential',
+    'Business',
+    'Multi-family',
+    'Facility maintenance',
+    'Other'
+  ];
 
   // Role options depend on the property type.
   const businessRoles: PropertyContactRole[] = ['Manager', 'Employee', 'Other'];
@@ -26,7 +36,7 @@
       on:click={() => select(option)}
     >
       <span class="dot" aria-hidden="true"></span>
-      <span>{option}</span>
+      <span>{PROPERTY_TYPE_LABELS[option]}</span>
     </button>
   {/each}
 </div>
@@ -58,6 +68,44 @@
           </button>
         {/each}
       </div>
+    </div>
+  </div>
+{:else if value === 'Facility maintenance'}
+  <!-- Mirrors the GoSameDay phone script's facility-maintenance questions
+       (business served, FM company, work order) — minus the after-hours
+       fee/NTE framing, which doesn't apply to web intake. -->
+  <div class="detail fade-in">
+    <div>
+      <label for="fmBusinessName">Business you're servicing</label>
+      <input
+        id="fmBusinessName"
+        type="text"
+        placeholder="e.g. Maple Street Cafe"
+        value={details.businessName}
+        on:input={(event) => intakeStore.updatePropertyDetails({ businessName: event.currentTarget.value })}
+      />
+    </div>
+    <div>
+      <label for="facilityCompany">Facility maintenance company</label>
+      <input
+        id="facilityCompany"
+        type="text"
+        placeholder="Your company's name"
+        value={details.facilityCompany}
+        on:input={(event) => intakeStore.updatePropertyDetails({ facilityCompany: event.currentTarget.value })}
+      />
+    </div>
+    <div>
+      <label for="workOrderNumber">Work order number <span class="optional-tag">optional</span></label>
+      <input
+        id="workOrderNumber"
+        type="text"
+        autocomplete="off"
+        placeholder="Leave blank if you don't have one yet"
+        value={details.workOrderNumber}
+        on:input={(event) => intakeStore.updatePropertyDetails({ workOrderNumber: event.currentTarget.value })}
+      />
+      <p class="field-hint">No work order yet? No problem — we'll confirm it with you before any billing.</p>
     </div>
   </div>
 {:else if value === 'Multi-family'}
@@ -155,6 +203,22 @@
     font-size: 0.9rem;
     color: var(--color-text);
     margin-bottom: 0.4rem;
+  }
+
+  .optional-tag {
+    font-weight: 500;
+    font-size: 0.74rem;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-left: 0.25rem;
+  }
+
+  .field-hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.84rem;
+    color: var(--color-muted);
+    line-height: 1.4;
   }
 
   .segmented {

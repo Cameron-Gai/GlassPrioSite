@@ -7,6 +7,7 @@
    */
   import { intakeStore } from '$lib/stores/intakeStore';
   import { describeTiming } from '$lib/utils/timing';
+  import { propertyTypeLabel } from '$lib/types/intake';
 
   const money = (n: number) => `$${n.toLocaleString()}`;
 
@@ -41,13 +42,19 @@
         <div>
           <dt>Property</dt>
           <dd>
-            {state.propertyType}{state.propertyDetails.businessName
+            {propertyTypeLabel(state.propertyType)}{state.propertyDetails.businessName
               ? ` · ${state.propertyDetails.businessName}`
               : state.propertyDetails.complexName
                 ? ` · ${state.propertyDetails.complexName}`
                 : ''}
           </dd>
         </div>
+        {#if state.propertyType === 'Facility maintenance' && state.propertyDetails.workOrderNumber}
+          <div>
+            <dt>Work order</dt>
+            <dd>{state.propertyDetails.workOrderNumber}</dd>
+          </div>
+        {/if}
       {/if}
       {#if hasAddress}
         <div>
