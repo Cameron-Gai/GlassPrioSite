@@ -1,3 +1,7 @@
+// CHANNEL PARITY — the booking-summary/externalData semantics here are
+// mirrored in GlassReports/src/lib/intake/booking.ts (the employee phone-
+// intake tool). When booking semantics change in either repo, consider the
+// sibling — port the change or leave a dated comment on the divergence.
 import { env } from '$env/dynamic/private';
 import type { IntakePayload } from '$lib/types/intake';
 import type { ServiceTitanConfig } from './config';

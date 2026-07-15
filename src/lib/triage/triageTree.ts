@@ -44,6 +44,11 @@ export interface TriageNode {
   options: TriageOption[];
 }
 
+// CHANNEL PARITY — this tree is mirrored in GlassReports/src/lib/intake/triage.ts
+// (the employee phone-intake tool). All booking channels share it: when you
+// change it here, consider the sibling — port the change or leave a dated
+// comment explaining the intentional divergence. Never let them drift silently.
+//
 // The old standalone "Is this an emergency?" yes/no gate was merged into the
 // service grid (2026-07-14): the red emergency tile below is one tap for the
 // urgent minority, and the non-urgent majority saves a whole screen.

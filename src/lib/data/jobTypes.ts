@@ -1,3 +1,9 @@
+/**
+ * CHANNEL PARITY — this catalog is mirrored in GlassReports/src/lib/intake/jobTypes.ts
+ * (the employee phone-intake tool). When you change job types here, consider
+ * the sibling — port the change or leave a dated comment explaining the
+ * intentional divergence. Never let them drift silently.
+ */
 export type JobPriority = 'Urgent' | 'High' | 'Normal' | 'Low';
 
 export type ConsultationFormat = 'on-site' | 'virtual' | 'none';
