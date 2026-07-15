@@ -200,6 +200,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     paidTotal: authorizedTotal,
     flag: fee.flag,
     businessUnitId,
+    jobTypeId: fee.jobTypeId,
     deferred,
     payLaterPhone,
     remoteConsult,

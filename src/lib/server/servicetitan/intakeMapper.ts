@@ -24,6 +24,10 @@ export interface BookingFeeContext {
   flag: string;
   /** Resolved ServiceTitan business-unit id for the ZIP + customer type (pre-fills the booking). */
   businessUnitId?: number | null;
+  /** ST job-type id the zone map resolved for this quote — booking jobTypeId
+   *  fallback when SERVICETITAN_JOB_TYPE_IDS has no entry (prefills the
+   *  conversion screen's Job Type dropdown). */
+  jobTypeId?: string | null;
   /** Customer chose "Pay later": the OSC is collected by a texted Stripe link once
    *  the booking is converted to a scheduled job (the GlassReports OSC pipeline). */
   deferred?: boolean;
@@ -381,8 +385,13 @@ export async function submitIntakeToServiceTitan(
   const fullName = `${payload.customer.firstName} ${payload.customer.lastName}`.trim();
 
   // Optional jobTypeId pre-fill — the CSR confirms/overrides at conversion, so
-  // a missing mapping is not a blocker in this flow.
+  // a missing mapping is not a blocker in this flow. Env override map first;
+  // else the id the zone map already resolved by name (its catalog is keyed by
+  // real ST job-type ids). CHANNEL PARITY: same fallback as the employee tool.
   const resolution = resolveJobTypeId(payload.selectedJobType.name, config.jobTypeIdOverrides);
+  const zoneMapJobTypeId = feeCtx?.jobTypeId ? Number(feeCtx.jobTypeId) : NaN;
+  const jobTypeId =
+    resolution.id ?? (Number.isFinite(zoneMapJobTypeId) && zoneMapJobTypeId > 0 ? zoneMapJobTypeId : null);
   const externalData = buildExternalData(payload, feeCtx);
 
   const start = buildBookingStart(payload.schedulingPreference, payload.specialInstructions.preferredWindow);
@@ -404,7 +413,7 @@ export async function submitIntakeToServiceTitan(
     isSendConfirmationEmail: false,
     ...(start ? { start } : {}),
     ...(config.campaignId !== null ? { campaignId: config.campaignId } : {}),
-    ...(resolution.id !== null ? { jobTypeId: resolution.id } : {}),
+    ...(jobTypeId !== null ? { jobTypeId } : {}),
     ...(feeCtx?.businessUnitId ? { businessUnitId: feeCtx.businessUnitId } : {}),
     ...(externalData ? { externalData } : {})
   };
