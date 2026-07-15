@@ -56,6 +56,47 @@
   const money = (n: number) =>
     `$${n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 
+  // Facility maintenance companies pay nothing upfront (mirrors the phone
+  // channel): the job bills against their work order, so no Stripe intent is
+  // ever created — we only fetch the charge amount to state it.
+  const isFacilityMaintenance = state.propertyType === 'Facility maintenance';
+
+  async function initFacilityMaintenance() {
+    phase = 'loading';
+    intakeStore.resetPayment();
+    let osc = 0;
+    let fmZone: string | null = null;
+    let serviced = false;
+    let flag = 'fee-service-unreachable';
+    try {
+      const res = await fetch(
+        `/api/quote?zip=${encodeURIComponent(zip)}&jobTypeName=${encodeURIComponent(jobTypeName)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        osc = Number(data.osc) || 0;
+        fmZone = data.zoneName ?? null;
+        serviced = data.serviced === true;
+        flag = data.flag ?? 'none';
+      }
+    } catch {
+      // Fall through — the office confirms the amount with the work order.
+    }
+    intakeStore.setFeeQuote({ serviced, osc, currency: 'usd', zoneName: fmZone, flag, paymentRequired: false });
+    const wo = state.propertyDetails.workOrderNumber.trim();
+    const woNote = wo
+      ? `work order ${wo}`
+      : "your work order — we'll confirm the number with you";
+    if (serviced && osc > 0) {
+      infoText = `No payment is needed now. The ${money(osc)} on-site consultation charge for your area (plus sales tax) bills against ${woNote}. Nothing is collected upfront.`;
+    } else if (serviced && flag === 'none') {
+      infoText = `No on-site consultation charge applies for this service — and as a facility maintenance company, nothing is collected upfront.`;
+    } else {
+      infoText = `No upfront payment for facility maintenance companies. Any consultation charge for your area bills against ${woNote}; our office will confirm the amount.`;
+    }
+    phase = 'info';
+  }
+
   function nonPaymentMessage(flag: string, amt: number): string {
     if (flag === 'unserviced-or-unknown') {
       return 'We could not match your ZIP to a service area. You can still submit — our office will confirm coverage and any fee when scheduling.';
@@ -74,6 +115,10 @@
   }
 
   async function init() {
+    if (isFacilityMaintenance) {
+      await initFacilityMaintenance();
+      return;
+    }
     phase = 'loading';
     payError = '';
     intakeStore.resetPayment();

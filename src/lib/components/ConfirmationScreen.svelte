@@ -127,7 +127,13 @@
       <span class="charge-label">On-site consultation charge</span>
       <span class="charge-amount">
         {money(charge.osc)}
-        {#if state.paymentAuthorized}
+        {#if state.propertyType === 'Facility maintenance'}
+          <span class="later">
+            Bills to {state.propertyDetails.workOrderNumber
+              ? `work order ${state.propertyDetails.workOrderNumber}`
+              : 'your work order'} — nothing collected upfront
+          </span>
+        {:else if state.paymentAuthorized}
           <span class="paid">Paid</span>
         {:else if state.remoteConsult}
           <span class="later">Waived — remote consultation first</span>

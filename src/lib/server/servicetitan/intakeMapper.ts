@@ -28,6 +28,9 @@ export interface BookingFeeContext {
   /** Customer opted into a remote (virtual) consultation: the OSC is waived until
    *  we roll a truck, so nothing is collected online and the booking notes say so. */
   remoteConsult?: boolean;
+  /** Facility maintenance company: nothing is collected upfront — the job bills
+   *  against their work order (same model as the phone channel). */
+  facilityMaintenance?: boolean;
 }
 
 /**
@@ -169,6 +172,9 @@ function feeLine(feeCtx?: BookingFeeContext): string | null {
   if (!feeCtx) return null;
   const zone = feeCtx.zoneName ? ` (Zone ${feeCtx.zoneName})` : '';
   if (feeCtx.serviced && feeCtx.osc > 0) {
+    if (feeCtx.facilityMaintenance) {
+      return `On-site consultation charge: $${feeCtx.osc}${zone} - FACILITY MAINTENANCE: do NOT collect upfront. Bills against the caller's work order (see the work order line below).`;
+    }
     if (feeCtx.remoteConsult) {
       return `On-site consultation charge: $${feeCtx.osc}${zone} - WAIVED, customer opted into a REMOTE consultation. Review the attached photos first; the charge applies only if/when a truck is rolled.`;
     }

@@ -95,9 +95,14 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const interior = payload.selectedJobType.category === 'shower-mirror';
   const fee = await resolveFee(payload.address.zip, payload.selectedJobType.name);
   const feeDue = fee.serviced && fee.osc > 0;
+  // Facility maintenance companies pay NOTHING upfront (mirrors the phone
+  // channel): the job bills against their work order. Enforced server-side —
+  // any payment intent, pay-later, or remote-consult flags on an FM payload
+  // are ignored, so no crafted request can be charged.
+  const facilityMaintenance = payload.propertyType === 'Facility maintenance';
   // Customer opted into a remote consultation: the OSC is WAIVED until we roll a
   // truck, so nothing is collected online now and the booking notes say so.
-  const remoteConsult = feeDue && payload.remoteConsult === true;
+  const remoteConsult = feeDue && !facilityMaintenance && payload.remoteConsult === true;
   const businessUnitId = resolveBusinessUnitId(fee.market, customerType, interior, remoteConsult);
   // Customer chose "Pay later" at the charge step: book unpaid and hand the OSC to
   // GlassReports, which texts a Stripe link once the booking converts to a job.
@@ -106,8 +111,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
   // without consent the UI blocks the option; if a payload claims pay-later
   // without consent anyway, book it as ordinary office-collects instead.
   const deferred =
-    feeDue && !remoteConsult && payload.payLater === true && payload.textConsent === true;
-  if (feeDue && !remoteConsult && payload.payLater === true && payload.textConsent !== true) {
+    feeDue && !remoteConsult && !facilityMaintenance &&
+    payload.payLater === true && payload.textConsent === true;
+  if (feeDue && !remoteConsult && !facilityMaintenance && payload.payLater === true && payload.textConsent !== true) {
     console.warn('[api/intake] pay-later requested without texting consent — treating as office-collects');
   }
   const payLaterPhone = deferred
@@ -122,7 +128,15 @@ export const POST: RequestHandler = async ({ request, url }) => {
   let authorizedIntentId: string | null = null;
   /** Dollars actually authorized (base OSC + sales tax when quoted). */
   let authorizedTotal: number | null = null;
-  const intentId = (payload.paymentIntentId ?? '').trim();
+  // FM payloads never charge — drop any intent id before the capture path.
+  const intentId = facilityMaintenance ? '' : (payload.paymentIntentId ?? '').trim();
+  if (feeDue && facilityMaintenance) {
+    console.log('[api/intake] facility maintenance — nothing collected upfront; bills against work order', {
+      osc: fee.osc,
+      zip: payload.address.zip,
+      workOrder: payload.propertyDetails.workOrderNumber || '(pending)'
+    });
+  }
   if (feeDue && !remoteConsult && intentId) {
     let intent;
     try {
@@ -166,7 +180,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       zip: payload.address.zip,
       textTo: payLaterPhone
     });
-  } else if (feeDue) {
+  } else if (feeDue && !facilityMaintenance) {
     // OSC due but nothing was authorized online — book unpaid; the office collects
     // at scheduling. (Mirrors the "we'll collect when scheduling" message the
     // customer sees when Stripe is unavailable/degraded.)
@@ -188,7 +202,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     businessUnitId,
     deferred,
     payLaterPhone,
-    remoteConsult
+    remoteConsult,
+    facilityMaintenance
   };
 
   const config = getServiceTitanConfig();
