@@ -203,13 +203,15 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: false
   },
   {
-    name: 'Hardware Service Consultation - Commercial',
+    // Renamed in live ServiceTitan (verified 2026-07-15) — the name must
+    // byte-match ST/zone-map for quote + booking prefill matching.
+    name: 'Hardware Service & Diagnostic Consultation - Commercial',
     priority: 'Normal',
     duration: '1 hour 30 minutes',
     category: 'hardware',
     customerFacing: true,
     publicIntakeEnabled: true,
-    customerLabel: 'Hardware Service — Commercial',
+    customerLabel: 'Hardware Service and Diagnostics — Commercial',
     summary:
       'Assessment and diagnostic for commercial window or door hardware. The $145 service fee covers the first hour of work.',
     includes: [
@@ -225,13 +227,17 @@ export const jobTypes: JobType[] = [
     consultationFormat: 'on-site'
   },
   {
+    // NOTE: live ServiceTitan still names this 'Hardware Service Consultation -
+    // Residential' (checked 2026-07-15) — only the commercial twin was renamed
+    // there. Keep this internal name until ST renames; customerLabel carries
+    // the new customer-facing wording.
     name: 'Hardware Service Consultation - Residential',
     priority: 'Normal',
     duration: '1 hour 30 minutes',
     category: 'hardware',
     customerFacing: true,
     publicIntakeEnabled: true,
-    customerLabel: 'Hardware Service — Residential',
+    customerLabel: 'Hardware Service and Diagnostics — Residential',
     summary:
       'Assessment and diagnostic for residential window or door hardware. The $350 service fee covers the first hour of work.',
     includes: [

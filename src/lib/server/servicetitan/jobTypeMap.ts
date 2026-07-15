@@ -26,7 +26,7 @@ export const DEFAULT_JOB_TYPE_ID_MAP: Record<string, number | null> = {
   'Custom Shower Enclosure - Consultation': null,
   'Custom Mirrors - Consultation': null,
   'Hardware Service Consultation - Residential': null,
-  'Hardware Service Consultation - Commercial': null,
+  'Hardware Service & Diagnostic Consultation - Commercial': null,
   'Multiservice Consultation': null,
   'Advanced Measurement System (AMS)': null,
   Other: null
