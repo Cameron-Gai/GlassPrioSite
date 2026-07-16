@@ -21,6 +21,9 @@
    *  or a remote consultation that waives the visit charge entirely. */
   type PayChoice = 'now' | 'later' | 'remote';
   let payChoice: PayChoice = 'now';
+  /** False when GlassReports' OSC collection pipeline is off — the pay-by-text
+   *  promise can't be made because nothing would send the link. */
+  let payLaterAvailable = true;
   let remoteError = '';
   /** Pay-later needs an explicit texting consent (the text IS the collection
    *  channel) and lets the customer point the link at a different number. */
@@ -147,6 +150,8 @@
       zoneName = data.zoneName ?? null;
       const flag = data.flag ?? 'none';
       debugMode = data.debug === true;
+      payLaterAvailable = data.payLaterAvailable !== false;
+      if (!payLaterAvailable && payChoice === 'later') payChoice = 'now';
 
       // Operator diagnostics: the server attaches a stable `code` for any
       // collect-later outcome, plus a verbose `reason` only when PAYMENT_DEBUG is
@@ -312,18 +317,20 @@
         <span class="choice-title">Pay now</span>
         <span class="choice-sub">Done in 30 seconds — nothing to chase later.</span>
       </button>
-      <button
-        type="button"
-        role="radio"
-        aria-checked={payChoice === 'later'}
-        class="choice"
-        class:active={payChoice === 'later'}
-        on:click={() => (payChoice = 'later')}
-        disabled={phase === 'submitting'}
-      >
-        <span class="choice-title">Text me a payment link</span>
-        <span class="choice-sub">A secure link arrives once your appointment is scheduled.</span>
-      </button>
+      {#if payLaterAvailable}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={payChoice === 'later'}
+          class="choice"
+          class:active={payChoice === 'later'}
+          on:click={() => (payChoice = 'later')}
+          disabled={phase === 'submitting'}
+        >
+          <span class="choice-title">Text me a payment link</span>
+          <span class="choice-sub">A secure link arrives once your appointment is scheduled.</span>
+        </button>
+      {/if}
       <button
         type="button"
         role="radio"

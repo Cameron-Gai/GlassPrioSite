@@ -63,6 +63,7 @@ export const POST: RequestHandler = async ({ request }) => {
       serviced: true,
       zoneName: fee.zoneName,
       flag,
+      payLaterAvailable: fee.payLaterAvailable,
       debug,
       ...(code ? { code } : {}),
       ...(debug ? { stripeMode: getStripeMode() ?? 'legacy', reason } : {}),
@@ -113,6 +114,7 @@ export const POST: RequestHandler = async ({ request }) => {
       clientSecret: auth.clientSecret,
       paymentIntentId: auth.id,
       publishableKey,
+      payLaterAvailable: fee.payLaterAvailable,
       debug,
       ...(debug ? { stripeMode: getStripeMode() ?? 'legacy' } : {}),
     });

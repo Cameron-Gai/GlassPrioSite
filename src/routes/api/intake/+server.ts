@@ -14,6 +14,7 @@ import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
 import { captureIntent, cancelIntent, getIntent, updateIntentMetadata } from '$lib/server/payments/stripe';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { registerDeferredOsc } from '$lib/server/oscRegister';
+import { notifyBookingEvent } from '$lib/server/bookingEvent';
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
@@ -111,7 +112,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   // without consent the UI blocks the option; if a payload claims pay-later
   // without consent anyway, book it as ordinary office-collects instead.
   const deferred =
-    feeDue && !remoteConsult && !facilityMaintenance &&
+    feeDue && !remoteConsult && !facilityMaintenance && fee.payLaterAvailable &&
     payload.payLater === true && payload.textConsent === true;
   if (feeDue && !remoteConsult && !facilityMaintenance && payload.payLater === true && payload.textConsent !== true) {
     console.warn('[api/intake] pay-later requested without texting consent — treating as office-collects');
@@ -309,6 +310,30 @@ export const POST: RequestHandler = async ({ request, url }) => {
       paid: true,
       chargedAmount: authorizedTotal,
       paymentRef: authorizedIntentId
+    });
+  }
+
+  // Booking alert to GlassReports (per-intake-tool notifications; best-effort,
+  // real bookings only — mock confirmations are dev noise).
+  if (booked) {
+    await notifyBookingEvent({
+      confirmationNumber: String(confirmation.confirmationNumber),
+      bookingId: booked.bookingId,
+      jobTypeName: payload.selectedJobType.name,
+      customerName: `${payload.customer.firstName} ${payload.customer.lastName}`.trim(),
+      phone: payload.customer.phone,
+      address: `${payload.address.street}, ${payload.address.city} ${payload.address.zip}`,
+      isEmergency: payload.routing.isEmergency,
+      oscAmount: fee.serviced ? fee.osc : null,
+      paymentNote: facilityMaintenance
+        ? `FM work order ${payload.propertyDetails.workOrderNumber || '(pending)'} — no upfront collection`
+        : captured
+          ? `Paid online ($${(authorizedTotal ?? fee.osc).toFixed(2)})`
+          : remoteConsult
+            ? 'Remote consultation — OSC waived unless a truck rolls'
+            : deferred
+              ? 'Pay by text — link sends on conversion'
+              : 'Collect at scheduling'
     });
   }
 

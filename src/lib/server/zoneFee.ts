@@ -30,6 +30,9 @@ export interface FeeQuote {
   /** Service market for the ZIP (e.g. 'Seattle'), or '' when not set — drives BU routing. */
   market: string;
   flag: FeeFlag;
+  /** False when GlassReports' OSC collection pipeline is off — pay-by-text must
+   *  not be offered (nothing would ever send the link). */
+  payLaterAvailable: boolean;
 }
 
 function baseUrl(): string | null {
@@ -44,6 +47,7 @@ export function isFeeServiceConfigured(): boolean {
 export async function resolveFee(zip: string, jobTypeName: string): Promise<FeeQuote> {
   const soft = (flag: FeeFlag): FeeQuote => ({
     serviced: false, osc: 0, currency: 'usd', zoneId: null, zoneName: null, jobTypeId: null, market: '', flag,
+    payLaterAvailable: true,
   });
 
   const url = baseUrl();
@@ -65,7 +69,7 @@ export async function resolveFee(zip: string, jobTypeName: string): Promise<FeeQ
       headers: { 'x-zone-map-token': token, accept: 'application/json' },
     });
     if (!r.ok) return soft('fee-service-unreachable');
-    const q = (await r.json()) as Partial<FeeQuote> & { osc?: number; market?: string };
+    const q = (await r.json()) as Partial<FeeQuote> & { osc?: number; market?: string; oscTextingEnabled?: boolean };
     const serviced = q.serviced === true;
     const osc = Number(q.osc) || 0;
     return {
@@ -77,6 +81,9 @@ export async function resolveFee(zip: string, jobTypeName: string): Promise<FeeQ
       jobTypeId: q.jobTypeId ?? (jobTypeId || null),
       market: typeof q.market === 'string' ? q.market : '',
       flag: serviced ? 'none' : 'unserviced-or-unknown',
+      // GlassReports' OSC collection pipeline controls pay-by-text on every
+      // channel; absent field (older GlassReports) keeps the option available.
+      payLaterAvailable: q.oscTextingEnabled !== false,
     };
   } catch {
     return soft('fee-service-unreachable');
