@@ -33,6 +33,10 @@ export interface BookingFeeContext {
   deferred?: boolean;
   /** Where the pay-later link is texted (may differ from the contact phone). */
   payLaterPhone?: string | null;
+  /** Fixed service fee collected upfront with the OSC (e.g. residential hardware $350). */
+  upfrontFee?: number;
+  /** True when the job type's fee is billed AFTER the visit (net-30) — never collected at intake. */
+  feeBilledAfter?: boolean;
   /** Customer opted into a remote (virtual) consultation: the OSC is waived until
    *  we roll a truck, so nothing is collected online and the booking notes say so. */
   remoteConsult?: boolean;
@@ -268,6 +272,13 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   lines.push(`Customer type: ${inferCustomerType(payload)} (set the Customer Type toggle to match)`);
   const fee = feeLine(feeCtx);
   if (fee) lines.push(fee);
+  // Fixed service-fee handling (per Jim 2026-07-16): upfront fees ride the
+  // OSC collection; billed-after fees are invoiced post-visit (net-30).
+  if (feeCtx?.feeBilledAfter) {
+    lines.push('SERVICE FEE: billed AFTER the visit (net-30 accounts) - do NOT collect upfront. Covers the first visit: up to 1 hour + parts under $350.');
+  } else if (feeCtx?.upfrontFee && feeCtx.upfrontFee > 0) {
+    lines.push(`SERVICE FEE: $${feeCtx.upfrontFee} collected upfront with the OSC. Covers the first visit: up to 1 hour + parts under $350; becomes part of the deposit if a window/door replacement is required.`);
+  }
   // Returning-customer linkage note for the CSR (ids also in externalData).
   const rc = payload.returningCustomer;
   if (rc?.matched) {

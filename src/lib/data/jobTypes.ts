@@ -15,6 +15,18 @@ export interface PricingInfo {
   detail?: string;
   /** Optional rebate / credit shown as a positive callout. */
   rebate?: string;
+  /**
+   * Fixed service fee (dollars) COLLECTED UPFRONT alongside the on-site charge
+   * (per Jim, 2026-07-16: "$350 on the retail"). The payment paths add it to
+   * the OSC when charging.
+   */
+  upfrontFee?: number;
+  /**
+   * True when the fee is billed AFTER the visit instead of collected at intake
+   * (per Jim: "$145 after if possible — most accounts are on net 30 billing").
+   * No upfront collection is offered for these job types.
+   */
+  billedAfter?: boolean;
 }
 
 export interface JobType {
@@ -213,16 +225,17 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: true,
     customerLabel: 'Hardware Service and Diagnostics — Commercial',
     summary:
-      'Assessment and diagnostic for commercial window or door hardware. The $145 service fee covers the first hour of work.',
+      'Service and diagnostics for commercial window or door hardware. The $145 fee covers the first visit — up to an hour of work and any parts under $350.',
     includes: [
       'Diagnostic and assessment',
-      'First hour of labor',
-      'Proposal for any additional parts or labor'
+      'First visit: up to an hour of labor + parts under $350',
+      'Any additional parts and labor quoted after the diagnostic'
     ],
     pricing: {
-      display: '$145 service fee',
+      display: '$145 service fee — billed after the visit',
       detail:
-        'Covers diagnostic + first hour; the fee is separate from the cost of any work. If we can’t offer a solution, only the $125 site assessment fee applies.'
+        'Covers the first visit: up to an hour of work and any parts under $350. Additional parts and labor are added after the diagnostic. Billed after the visit — most accounts are on net-30.',
+      billedAfter: true
     },
     consultationFormat: 'on-site'
   },
@@ -239,16 +252,17 @@ export const jobTypes: JobType[] = [
     publicIntakeEnabled: true,
     customerLabel: 'Hardware Service and Diagnostics — Residential',
     summary:
-      'Assessment and diagnostic for residential window or door hardware. The $350 service fee covers the first hour of work.',
+      'Service and diagnostics for residential window or door hardware. The $350 fee covers the first visit — up to an hour of work and any parts under $350.',
     includes: [
       'Diagnostic and assessment',
-      'First hour of labor',
-      'Proposal for any additional parts or labor'
+      'First visit: up to an hour of labor + parts under $350',
+      'Any additional parts and labor quoted after the diagnostic'
     ],
     pricing: {
       display: '$350 service fee',
       detail:
-        'Covers diagnostic + first hour; the fee is separate from the cost of any work. If we can’t offer a solution, only the $125 site assessment fee applies.'
+        'Covers the first visit: up to an hour of work and any parts under $350. Additional parts and labor are added after the diagnostic. If a new window or door replacement is required, the $350 becomes part of the deposit on that work.',
+      upfrontFee: 350
     },
     consultationFormat: 'on-site'
   },

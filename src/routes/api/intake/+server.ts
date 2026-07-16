@@ -10,6 +10,7 @@ import {
 } from '$lib/server/servicetitan';
 import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
 import { resolveFee } from '$lib/server/zoneFee';
+import { getJobType } from '$lib/data/jobTypes';
 import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
 import { captureIntent, cancelIntent, getIntent, updateIntentMetadata } from '$lib/server/payments/stripe';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
@@ -95,7 +96,18 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const customerType = customerTypeForPropertyType(payload.propertyType);
   const interior = payload.selectedJobType.category === 'shower-mirror';
   const fee = await resolveFee(payload.address.zip, payload.selectedJobType.name);
-  const feeDue = fee.serviced && fee.osc > 0;
+  // Fee semantics (per Jim 2026-07-16): upfront service fees are collected with
+  // the OSC; billed-after fees (net-30 accounts) are never collected at intake.
+  let jobPricing: { upfrontFee?: number; billedAfter?: boolean } = {};
+  try {
+    jobPricing = getJobType(payload.selectedJobType.name).pricing ?? {};
+  } catch {
+    /* unknown job type — OSC-only behavior */
+  }
+  const upfrontFee = fee.serviced && !jobPricing.billedAfter && typeof jobPricing.upfrontFee === 'number' ? jobPricing.upfrontFee : 0;
+  const chargeBase = fee.osc + upfrontFee;
+  /** True when something is collectible at intake (OSC and/or upfront fee). */
+  const feeDue = fee.serviced && chargeBase > 0 && !jobPricing.billedAfter;
   // Facility maintenance companies pay NOTHING upfront (mirrors the phone
   // channel): the job bills against their work order. Enforced server-side —
   // any payment intent, pay-later, or remote-consult flags on an FM payload
@@ -146,12 +158,13 @@ export const POST: RequestHandler = async ({ request, url }) => {
       console.error('[api/intake] could not retrieve payment intent', verifyError);
       return json({ success: false, error: 'We could not verify your payment. Please try again.' }, { status: 502 });
     }
-    // The intent was created for base OSC + WA sales tax (same DOR lookup, cached
-    // so both calls see the same rate). Accept the tax-inclusive total, or the
-    // bare base for intents created while the tax lookup was degraded.
+    // The intent was created for the charge base (OSC + upfront service fee) +
+    // WA sales tax (same DOR lookup, cached so both calls see the same rate).
+    // Accept the tax-inclusive total, or the bare base for intents created
+    // while the tax lookup was degraded.
     const tax = await lookupWaSalesTax({ street: payload.address.street, city: payload.address.city, zip: payload.address.zip });
-    const expectedTotalCents = Math.round((fee.osc + taxAmountOn(fee.osc, tax)) * 100);
-    const baseCents = Math.round(fee.osc * 100);
+    const expectedTotalCents = Math.round((chargeBase + taxAmountOn(chargeBase, tax)) * 100);
+    const baseCents = Math.round(chargeBase * 100);
     const amountOk = intent.amount === expectedTotalCents || intent.amount === baseCents;
     if (intent.status !== 'requires_capture' || !amountOk || intent.currency !== fee.currency) {
       console.warn('[api/intake] payment intent mismatch', {
@@ -202,6 +215,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     flag: fee.flag,
     businessUnitId,
     jobTypeId: fee.jobTypeId,
+    upfrontFee,
+    feeBilledAfter: jobPricing.billedAfter === true,
     deferred,
     payLaterPhone,
     remoteConsult,
@@ -300,7 +315,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     await registerDeferredOsc({
       externalId: booked.externalId,
       bookingId: booked.bookingId,
-      amount: fee.osc,
+      amount: chargeBase,
       currency: fee.currency,
       zip: payload.address.zip,
       jobTypeId: fee.jobTypeId,
@@ -344,7 +359,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
     await registerDeferredOsc({
       externalId: booked.externalId,
       bookingId: booked.bookingId,
-      amount: fee.osc,
+      // Charge base — the texted link collects the upfront service fee too.
+      amount: chargeBase,
       currency: fee.currency,
       zip: payload.address.zip,
       jobTypeId: fee.jobTypeId,

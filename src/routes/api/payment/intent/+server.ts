@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { resolveFee } from '$lib/server/zoneFee';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
+import { getJobType } from '$lib/data/jobTypes';
 import { createAuthorization, findOrCreateCustomer, getPublishableKey, isStripeConfigured, classifyStripeError, getStripeMode } from '$lib/server/payments/stripe';
 
 /** Operators flip PAYMENT_DEBUG=true (Railway var) to surface the precise failure
@@ -38,16 +39,40 @@ export const POST: RequestHandler = async ({ request }) => {
   const fee = await resolveFee(zip, jobTypeName);
   const debug = paymentDebugEnabled();
 
-  if (!(fee.serviced && fee.osc > 0)) {
+  // Fee semantics from the shared catalog (per Jim 2026-07-16): some job types
+  // carry a fixed service fee collected UPFRONT with the OSC (residential
+  // hardware $350); others are billed AFTER the visit (commercial hardware
+  // $145, net-30 accounts) and must not be collected at intake.
+  let pricing: { upfrontFee?: number; billedAfter?: boolean } = {};
+  try {
+    pricing = getJobType(jobTypeName).pricing ?? {};
+  } catch {
+    // Unknown job type name — no fee semantics; OSC-only behavior.
+  }
+  if (pricing.billedAfter) {
+    return json({
+      paymentRequired: false,
+      amount: fee.osc,
+      currency: fee.currency,
+      serviced: fee.serviced,
+      flag: 'billed-after',
+      payLaterAvailable: false
+    });
+  }
+  const upfrontFee = fee.serviced && typeof pricing.upfrontFee === 'number' ? pricing.upfrontFee : 0;
+  const chargeBase = fee.osc + upfrontFee;
+
+  if (!(fee.serviced && chargeBase > 0)) {
     return json({ paymentRequired: false, amount: fee.osc, currency: fee.currency, serviced: fee.serviced, flag: fee.flag });
   }
 
-  // Sales tax on the OSC, from WA DOR by service address (the same source
-  // ServiceTitan's tax zones sync from — the invoice will show this rate).
-  // Best-effort: a failed lookup charges the untaxed base rather than blocking.
+  // Sales tax on the charge base (OSC + upfront service fee), from WA DOR by
+  // service address (the same source ServiceTitan's tax zones sync from — the
+  // invoice will show this rate). Best-effort: a failed lookup charges the
+  // untaxed base rather than blocking.
   const tax = await lookupWaSalesTax({ street: body.street, city: body.city, zip });
-  const taxAmount = taxAmountOn(fee.osc, tax);
-  const total = Math.round((fee.osc + taxAmount) * 100) / 100;
+  const taxAmount = taxAmountOn(chargeBase, tax);
+  const total = Math.round((chargeBase + taxAmount) * 100) / 100;
 
   // A charge-due response that, for whatever reason, can't be collected online.
   // We never block the lead: the customer still sees the amount and submits, and
@@ -57,8 +82,9 @@ export const POST: RequestHandler = async ({ request }) => {
     json({
       paymentRequired: false,
       amount: total,
-      baseAmount: fee.osc,
+      baseAmount: chargeBase,
       taxAmount,
+      upfrontFee,
       currency: fee.currency,
       serviced: true,
       zoneName: fee.zoneName,
@@ -98,6 +124,7 @@ export const POST: RequestHandler = async ({ request }) => {
         zoneId: fee.zoneId ?? '',
         jobTypeId: fee.jobTypeId ?? '',
         osc: String(fee.osc),
+        upfrontFee: String(upfrontFee),
         taxAmount: String(taxAmount),
         taxLocationCode: tax?.locationCode ?? '',
         ...(customerName ? { customerName } : {}),
@@ -107,8 +134,9 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({
       paymentRequired: true,
       amount: total,
-      baseAmount: fee.osc,
+      baseAmount: chargeBase,
       taxAmount,
+      upfrontFee,
       currency: fee.currency,
       zoneName: fee.zoneName,
       clientSecret: auth.clientSecret,

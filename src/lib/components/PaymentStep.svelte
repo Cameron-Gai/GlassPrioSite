@@ -13,6 +13,8 @@
   let phase: Phase = 'loading';
   let amount = 0;
   let taxAmount = 0;
+  /** Fixed service fee included in `amount` (e.g. residential hardware $350). */
+  let upfrontFee = 0;
   let currency = 'usd';
   let zoneName: string | null = null;
   let infoText = '';
@@ -101,6 +103,9 @@
   }
 
   function nonPaymentMessage(flag: string, amt: number): string {
+    if (flag === 'billed-after') {
+      return 'Nothing to pay now — the service fee is billed after the visit (most accounts are on net-30 billing).';
+    }
     if (flag === 'unserviced-or-unknown') {
       return 'We could not match your ZIP to a service area. You can still submit — our office will confirm coverage and any fee when scheduling.';
     }
@@ -152,6 +157,7 @@
       debugMode = data.debug === true;
       payLaterAvailable = data.payLaterAvailable !== false;
       if (!payLaterAvailable && payChoice === 'later') payChoice = 'now';
+      upfrontFee = Number(data.upfrontFee) || 0;
 
       // Operator diagnostics: the server attaches a stable `code` for any
       // collect-later outcome, plus a verbose `reason` only when PAYMENT_DEBUG is
@@ -298,7 +304,8 @@
     {/if}
   {:else}
     <p class="amount-line">
-      On-site charge: <strong>{money(amount)}</strong>{#if taxAmount > 0}<span class="tax-note"> (includes {money(taxAmount)} sales tax)</span>{/if}
+      {upfrontFee > 0 ? 'Service fee & on-site charge' : 'On-site charge'}: <strong>{money(amount)}</strong>{#if upfrontFee > 0 || taxAmount > 0}<span class="tax-note">
+          ({#if upfrontFee > 0}includes the {money(upfrontFee)} service fee{/if}{#if upfrontFee > 0 && taxAmount > 0} + {/if}{#if taxAmount > 0}{money(taxAmount)} sales tax{/if})</span>{/if}
       {#if zoneName}<span class="muted"> · {zoneName}</span>{/if}
     </p>
 
