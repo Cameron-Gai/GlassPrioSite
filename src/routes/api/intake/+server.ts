@@ -15,6 +15,7 @@ import { resolveBusinessUnitId } from '$lib/server/servicetitan/businessUnits';
 import { captureIntent, cancelIntent, getIntent, updateIntentMetadata } from '$lib/server/payments/stripe';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { registerDeferredOsc } from '$lib/server/oscRegister';
+import { payByTextBlockedReason } from '$lib/server/payByText';
 import { notifyBookingEvent } from '$lib/server/bookingEvent';
 
 function isNonEmptyString(value: unknown): value is string {
@@ -123,10 +124,27 @@ export const POST: RequestHandler = async ({ request, url }) => {
   // consent is REQUIRED for pay-later: the collection channel IS the text, so
   // without consent the UI blocks the option; if a payload claims pay-later
   // without consent anyway, book it as ordinary office-collects instead.
+  // The pay-by-text rule itself lives in one module shared with
+  // /api/payment/intent, so the offer the wizard showed and the registration we
+  // actually make can never disagree. Enforced HERE regardless of what the
+  // wizard decided: the load-bearing case is an urgent job, where a texted link
+  // would be a second collection on a fee settled at the booking, and it is
+  // reachable without any customer mistake (choose pay-by-text on a normal job,
+  // then accept the Priority Service upgrade — the choice survives the swap).
+  const payByTextBlocked = payByTextBlockedReason({
+    jobTypeName: payload.selectedJobType.name,
+    propertyType: payload.propertyType,
+    oscTextingEnabled: fee.payLaterAvailable
+  });
   const deferred =
-    feeDue && !remoteConsult && !facilityMaintenance && fee.payLaterAvailable &&
+    feeDue && !remoteConsult && !facilityMaintenance && !payByTextBlocked &&
     payload.payLater === true && payload.textConsent === true;
-  if (feeDue && !remoteConsult && !facilityMaintenance && payload.payLater === true && payload.textConsent !== true) {
+  if (feeDue && !remoteConsult && !facilityMaintenance && payload.payLater === true && payByTextBlocked) {
+    console.warn(
+      `[api/intake] pay-later requested but blocked (${payByTextBlocked}) — treating as office-collects`,
+      { jobType: payload.selectedJobType.name, zip: payload.address.zip }
+    );
+  } else if (feeDue && !remoteConsult && !facilityMaintenance && payload.payLater === true && payload.textConsent !== true) {
     console.warn('[api/intake] pay-later requested without texting consent — treating as office-collects');
   }
   const payLaterPhone = deferred

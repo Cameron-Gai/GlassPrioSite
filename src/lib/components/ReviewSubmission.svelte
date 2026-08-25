@@ -59,6 +59,7 @@
           {state.issueDetails.isSecure ? 'Secure' : 'Not secure'}
           {state.issueDetails.hasBrokenGlass ? ' · Broken glass on site' : ''}
           {state.issueDetails.hasWaterOrWeatherEntry ? ' · Weather entering' : ''}
+          {state.issueDetails.hasFailedSeal ? ' · Fog between the panes' : ''}
         </dd>
       </div>
     </dl>

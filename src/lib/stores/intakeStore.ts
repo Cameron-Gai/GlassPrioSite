@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import { businessHours } from '$lib/config/businessHours';
+import { canonicalArrivalWindow } from '$lib/config/arrivalWindows';
 import { isBusinessHours } from '$lib/utils/businessHours';
 import {
   TRIAGE_ROOT_ID,
@@ -191,6 +192,7 @@ function initialState(): IntakeState {
       isSecure: true,
       hasBrokenGlass: false,
       hasWaterOrWeatherEntry: false,
+      hasFailedSeal: false,
       windowAccess: { floors: '', blocked: 'no', blockedNotes: '' },
       photos: [],
       categoryDetails: {
@@ -298,6 +300,13 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
   merged.triageHistory = merged.triageHistory.filter((id) => !!triageTree[id]);
   merged.answers = Object.fromEntries(
     Object.entries(merged.answers).filter(([id]) => !!triageTree[id])
+  );
+  // Heal an arrival window saved under a former label (the 8–11 / 11–2 / 2–5
+  // set, retired 2026-08-07 for ServiceTitan's real windows). Left as-is it
+  // would print an unbookable window on the booking note; an unrecognizable
+  // value clears to "any time" rather than silently becoming the 8:30 slot.
+  merged.specialInstructions.preferredWindow = canonicalArrivalWindow(
+    merged.specialInstructions.preferredWindow
   );
   // Guard against a step that isn't in this request's sequence (e.g. a draft
   // saved on the issue/site step before the emergency fast-track existed).

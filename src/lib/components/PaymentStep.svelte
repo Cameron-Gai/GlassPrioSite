@@ -5,6 +5,7 @@
   import { intakeStore } from '$lib/stores/intakeStore';
   import type { IntakeState } from '$lib/stores/intakeStore';
   import { formatUsPhoneInput } from '$lib/utils/phone';
+  import { reportClientError } from '$lib/stores/errorLog';
   import PhotoUploadMock from './PhotoUploadMock.svelte';
 
   export let state: IntakeState;
@@ -23,8 +24,10 @@
    *  or a remote consultation that waives the visit charge entirely. */
   type PayChoice = 'now' | 'later' | 'remote';
   let payChoice: PayChoice = 'now';
-  /** False when GlassReports' OSC collection pipeline is off — the pay-by-text
-   *  promise can't be made because nothing would send the link. */
+  /** False when the server says pay-by-text must not be promised for this
+   *  request — the OSC collection pipeline is off, or the job is one where a
+   *  texted link would be the wrong collection (urgent work, net-30, a facility
+   *  work order). The server decides; see $lib/server/payByText. */
   let payLaterAvailable = true;
   let remoteError = '';
   /** Pay-later needs an explicit texting consent (the text IS the collection
@@ -140,6 +143,9 @@
         body: JSON.stringify({
           zip,
           jobTypeName,
+          // Lets the server apply the full pay-by-text rule (it also blocks
+          // facility-maintenance callers, who bill against a work order).
+          propertyType: state.propertyType,
           street: state.address.street,
           city: state.address.city,
           email: state.customer.email,
@@ -164,6 +170,9 @@
       // on. Always log it to the console; surface it in-UI only when sent.
       if (data.code) {
         console.warn(`[PaymentStep] online payment not collected [${data.code}]${data.reason ? ': ' + data.reason : ''}`);
+        // Degradation, not a hard failure — but exactly what a bug report
+        // about "it wouldn't take my card" needs attached.
+        reportClientError('payment', `online payment not collected [${data.code}]`);
       }
       diagnostic = data.reason ? `Payment setup (${data.code}): ${data.reason}` : '';
 
@@ -197,6 +206,7 @@
       // (Server-side Stripe failures already degrade to a 200 collect-later
       // response; this catch handles client-side Stripe.js / network failures.)
       console.error('[PaymentStep] online payment setup failed', err);
+      reportClientError('payment', err);
       intakeStore.setFeeQuote({ serviced: amount > 0, osc: amount, currency, zoneName, flag: 'payment-unavailable', paymentRequired: false });
       // If we already know the charge, show it (better than a vague apology);
       // otherwise fall back to the generic confirm-at-scheduling line.
@@ -218,11 +228,13 @@
     console.log('[PaymentStep] confirmPayment →', { error: error?.message, status: paymentIntent?.status, id: paymentIntent?.id });
     if (error) {
       payError = error.message ?? 'Payment failed. Please check your card details.';
+      reportClientError('payment', payError);
       phase = 'card';
       return;
     }
     if (!paymentIntent || (paymentIntent.status !== 'requires_capture' && paymentIntent.status !== 'succeeded')) {
       payError = 'Your card was not authorized. Please try again.';
+      reportClientError('payment', `card not authorized (status: ${paymentIntent?.status ?? 'none'})`);
       phase = 'card';
       return;
     }

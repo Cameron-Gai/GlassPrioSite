@@ -16,6 +16,16 @@ export interface PricingInfo {
   /** Optional rebate / credit shown as a positive callout. */
   rebate?: string;
   /**
+   * The fixed dollar figure the display line quotes, as a STRUCTURED number —
+   * the single source of truth for fee math (the summary rail's subtotal here,
+   * the CSR sidebar in the employee tool). NOT necessarily collected upfront:
+   * see `upfrontFee` (rides the payment link) and `billedAfter` (net-30, never
+   * collected at intake). A display with no fixed figure ("Quoted on-site",
+   * zone-based) has no quotedFee. Keep it consistent with `display` — change
+   * the two together.
+   */
+  quotedFee?: number;
+  /**
    * Fixed service fee (dollars) COLLECTED UPFRONT alongside the on-site charge
    * (per Jim, 2026-07-16: "$350 on the retail"). The payment paths add it to
    * the OSC when charging.
@@ -71,6 +81,7 @@ export const jobTypes: JobType[] = [
     ],
     pricing: {
       display: '$350 per building',
+      quotedFee: 350,
       rebate: 'Future repairs skip the measure fee'
     },
     consultationFormat: 'on-site'
@@ -101,6 +112,7 @@ export const jobTypes: JobType[] = [
     ],
     pricing: {
       display: '$125 deposit on acceptance',
+      quotedFee: 125,
       detail:
         'A $125 non-refundable deposit is collected when you accept the rough estimate. It is applied toward the final invoice.'
     },
@@ -133,6 +145,7 @@ export const jobTypes: JobType[] = [
     ],
     pricing: {
       display: '$125 deposit on acceptance',
+      quotedFee: 125,
       detail:
         'A $125 non-refundable deposit is collected when you accept the rough estimate. It is applied toward the final invoice.'
     },
@@ -161,7 +174,7 @@ export const jobTypes: JobType[] = [
       'Cleanup of broken glass and debris',
       'Additional work quoted and approved before starting'
     ],
-    pricing: { display: '$575' }
+    pricing: { display: '$575', quotedFee: 575 }
   },
   {
     name: 'Glass Replacement (1-4 Panes) - Consultation',
@@ -233,6 +246,7 @@ export const jobTypes: JobType[] = [
     ],
     pricing: {
       display: '$145 service fee — billed after the visit',
+      quotedFee: 145,
       detail:
         'Covers the first visit: up to an hour of work and any parts under $350. Additional parts and labor are added after the diagnostic. Billed after the visit — most accounts are on net-30.',
       billedAfter: true
@@ -260,6 +274,7 @@ export const jobTypes: JobType[] = [
     ],
     pricing: {
       display: '$350 service fee',
+      quotedFee: 350,
       detail:
         'Covers the first visit: up to an hour of work and any parts under $350. Additional parts and labor are added after the diagnostic. If a new window or door replacement is required, the $350 becomes part of the deposit on that work.',
       upfrontFee: 350
@@ -420,6 +435,7 @@ export const jobTypes: JobType[] = [
     ],
     pricing: {
       display: '$399',
+      quotedFee: 399,
       rebate: '$199 rebate if you proceed with the repair'
     }
   },

@@ -31,7 +31,8 @@ export interface FeeQuote {
   market: string;
   flag: FeeFlag;
   /** False when GlassReports' OSC collection pipeline is off — pay-by-text must
-   *  not be offered (nothing would ever send the link). */
+   *  not be offered (nothing would ever send the link). The pipeline switch
+   *  alone: see $lib/server/payByText for the rest of the rule. */
   payLaterAvailable: boolean;
 }
 
@@ -83,6 +84,12 @@ export async function resolveFee(zip: string, jobTypeName: string): Promise<FeeQ
       flag: serviced ? 'none' : 'unserviced-or-unknown',
       // GlassReports' OSC collection pipeline controls pay-by-text on every
       // channel; absent field (older GlassReports) keeps the option available.
+      // Since 2026-07-30 this tracks the pipeline's `enabled` switch only —
+      // dry-run no longer reports false, so a dry-run pipeline will offer the
+      // option and log the send instead of texting. That is deliberate on the
+      // GlassReports side (dry-run is an operator test mode, not an outage).
+      // NOTE: this is only the pipeline switch. The full rule for whether
+      // pay-by-text may be offered lives in $lib/server/payByText.
       payLaterAvailable: q.oscTextingEnabled !== false,
     };
   } catch {

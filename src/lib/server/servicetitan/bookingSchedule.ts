@@ -7,6 +7,9 @@
  *
  * Kept free of SvelteKit-only imports so it can be executed directly.
  */
+// Relative, not `$lib` — this module is documented as directly executable, and
+// the alias only resolves inside Vite/SvelteKit. arrivalWindows is env-free.
+import { arrivalWindowStart } from '../../config/arrivalWindows';
 
 /** The shop's time zone; ServiceTitan expects real instants, customers pick wall-clock windows. */
 const PACIFIC_TZ = 'America/Los_Angeles';
@@ -47,12 +50,12 @@ function pacificToUtc(year: number, month: number, day: number, hour: number, mi
   return new Date(guess);
 }
 
-/** Local start time (hour, minute) for the intake's preferred-window options. */
+/** Local start time (hour, minute) for the chosen window — see
+ *  $lib/config/arrivalWindows (the one definition, mirroring ServiceTitan's
+ *  real arrival windows). 'Weekend' and "no preference" fall back to the first
+ *  window, which is what the resolver returns for anything it can't match. */
 function windowStartTime(preferredWindow: string): [number, number] {
-  if (preferredWindow.startsWith('Midday')) return [11, 0];
-  if (preferredWindow.startsWith('Afternoon')) return [14, 0];
-  // Morning, First available, Weekend, and "no preference" all open the day.
-  return [8, 0];
+  return arrivalWindowStart(preferredWindow);
 }
 
 /**

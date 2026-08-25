@@ -3,6 +3,7 @@
   import { canUpgradeToPriority } from '$lib/triage/triageTree';
   import { getPublicJobType } from '$lib/data/jobTypes';
   import { businessHours, type WeekdayKey } from '$lib/config/businessHours';
+  import { ARRIVAL_WINDOW_LABELS, canonicalArrivalWindow } from '$lib/config/arrivalWindows';
   import PriorityBadge from './PriorityBadge.svelte';
   import type { SchedulingPreference } from '$lib/types/intake';
 
@@ -50,15 +51,20 @@
 
   const dayOptions = buildDayOptions();
 
-  // Arrival windows match business hours (8am–5pm Pacific).
-  const arrivalWindows = ['Morning (8am–11am)', 'Midday (11am–2pm)', 'Afternoon (2pm–5pm)'];
+  // Arrival windows mirror the tenant's real ServiceTitan arrival windows —
+  // see $lib/config/arrivalWindows, the one definition. Never a hand-written
+  // list here: a slot dispatch can't book is a promise we can't keep.
+  const arrivalWindows = ARRIVAL_WINDOW_LABELS;
 
   $: state = $intakeStore;
   // Priority availability keys off the ORIGINAL job — choosing it swaps
   // selectedJobType to Priority Service, which is itself not upgradeable.
   $: canPriority = !state.isEmergency && canUpgradeToPriority(state.originalJobType ?? state.selectedJobType);
   $: priorityChosen = state.priorityUpgrade;
-  $: chosenWindow = state.specialInstructions.preferredWindow;
+  // Canonicalized so a draft saved under a former label ("Morning (8am–11am)")
+  // still highlights its tile. The store heals the stored value on hydrate;
+  // this covers the render in between.
+  $: chosenWindow = canonicalArrivalWindow(state.specialInstructions.preferredWindow);
 
   function choosePriority() {
     intakeStore.acceptPriorityUpgrade();

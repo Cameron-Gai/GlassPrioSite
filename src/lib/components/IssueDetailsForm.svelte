@@ -5,6 +5,8 @@
 
   export let value: IssueDetails;
   export let job: JobType | null;
+  /** True after the customer tried to continue — turns on per-field errors. */
+  export let showErrors = false;
 
   $: category = job?.category ?? '';
 
@@ -29,15 +31,9 @@
 
   $: details = value.categoryDetails;
 
-  // Progressive disclosure: the description is the hero; the typed secondary
-  // fields (where / when / window access) live behind "Add more detail".
-  // Auto-open when any of them already hold values (draft restore, back
-  // navigation, edit-from-review) so nothing ever looks lost.
-  let showMore =
-    value.serviceLocation.trim() !== '' ||
-    value.happenedAt.trim() !== '' ||
-    value.windowAccess.floors.trim() !== '' ||
-    value.windowAccess.blocked !== 'no';
+  // These used to hide behind an "Add more detail" fold marked optional.
+  // Required and always visible now (owner request 2026-08-25): a booking with
+  // no location or timeframe is too thin to dispatch.
 
   $: locationPlaceholder = (() => {
     switch (category) {
@@ -76,20 +72,25 @@
 </script>
 
 <div class="grid">
-  <!-- Hero: the one field that matters most. Everything on this step is optional. -->
+  <!-- Hero: the one field that matters most. -->
   <div>
     <label for="description">Describe the issue</label>
     <textarea
       id="description"
       class="hero"
+      class:field-error={showErrors && value.description.trim() === ''}
       rows="4"
       placeholder={descriptionPrompt}
       value={value.description}
       on:input={(event) => update('description', event.currentTarget.value)}
     ></textarea>
-    <p class="hint">
-      Details help us send the right person with the right materials.
-    </p>
+    {#if showErrors && value.description.trim() === ''}
+      <p class="field-error-msg">Please describe the issue.</p>
+    {:else}
+      <p class="hint">
+        Details help us send the right person with the right materials.
+      </p>
+    {/if}
   </div>
 
   <!-- Category-specific scope (storefront / shower-mirror / multi / hardware) -->
@@ -215,53 +216,55 @@
       />
       <span>Water or weather is entering the property</span>
     </label>
+    <!-- Failed insulated-glass seal (owner request 2026-08-06, parity with the
+         phone intake). Tapped here it reaches dispatch as an IGU replacement
+         rather than a broken pane — a different truck load — which is exactly
+         what gets lost when it only ever appears in the description. -->
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={value.hasFailedSeal}
+        on:change={(event) => update('hasFailedSeal', event.currentTarget.checked)}
+      />
+      <span>There is fog or moisture between the panes of glass</span>
+    </label>
   </fieldset>
 
-  <!-- Everything typed-and-optional folds away here. -->
-  <div class="more">
-    <button
-      type="button"
-      class="more-toggle"
-      aria-expanded={showMore}
-      on:click={() => (showMore = !showMore)}
-    >
-      <span class="more-chev" aria-hidden="true" data-open={showMore}>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 6l6 6-6 6" />
-        </svg>
-      </span>
-      <span class="more-label">
-        {showMore ? 'Hide extra detail' : 'Add more detail'}
-        <span class="more-sub">where it is, when it happened, window access — all optional</span>
-      </span>
-    </button>
+  <!-- Where / when — required (owner request 2026-08-25; previously folded
+       away behind "Add more detail" and marked optional). -->
+  <div class="detail-fields">
+    <div>
+      <label for="serviceLocation">Where is the issue?</label>
+      <input
+        id="serviceLocation"
+        type="text"
+        class:field-error={showErrors && value.serviceLocation.trim() === ''}
+        placeholder={locationPlaceholder}
+        value={value.serviceLocation}
+        on:input={(event) => update('serviceLocation', event.currentTarget.value)}
+      />
+      {#if showErrors && value.serviceLocation.trim() === ''}
+        <p class="field-error-msg">Please tell us where the issue is.</p>
+      {/if}
+    </div>
 
-    {#if showMore}
-      <div class="more-body fade-in">
-        <div>
-          <label for="serviceLocation">Where is the issue?</label>
-          <input
-            id="serviceLocation"
-            type="text"
-            placeholder={locationPlaceholder}
-            value={value.serviceLocation}
-            on:input={(event) => update('serviceLocation', event.currentTarget.value)}
-          />
-        </div>
+    <div>
+      <label for="happenedAt">When did this happen?</label>
+      <input
+        id="happenedAt"
+        type="text"
+        class:field-error={showErrors && value.happenedAt.trim() === ''}
+        placeholder="Today around 2pm, last night, last week..."
+        value={value.happenedAt}
+        on:input={(event) => update('happenedAt', event.currentTarget.value)}
+      />
+      {#if showErrors && value.happenedAt.trim() === ''}
+        <p class="field-error-msg">Please tell us roughly when this happened.</p>
+      {/if}
+    </div>
 
-        <div>
-          <label for="happenedAt">When did this happen?</label>
-          <input
-            id="happenedAt"
-            type="text"
-            placeholder="Today around 2pm, last night, last week..."
-            value={value.happenedAt}
-            on:input={(event) => update('happenedAt', event.currentTarget.value)}
-          />
-        </div>
-
-        <fieldset class="block">
-          <legend>Window location &amp; access</legend>
+    <fieldset class="block">
+      <legend>Window location &amp; access <span class="legend-optional">optional</span></legend>
           <div>
             <label for="floors">What floor(s) is the window on?</label>
             <input
@@ -304,9 +307,7 @@
               No problem — a photo of the area helps our team plan access. You can add one on the next step.
             </p>
           {/if}
-        </fieldset>
-      </div>
-    {/if}
+    </fieldset>
   </div>
 </div>
 
@@ -399,59 +400,26 @@
     margin: 0;
   }
 
-  .more {
+  .detail-fields {
     display: grid;
-    gap: 0.85rem;
+    gap: 1.05rem;
   }
 
-  .more-toggle {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.55rem;
-    text-align: left;
-    padding: 0.75rem 0.9rem;
-    border: 1px dashed var(--color-border-strong);
-    border-radius: var(--radius-md);
-    background: var(--color-surface-tint);
-    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
-  }
-
-  .more-toggle:hover {
-    border-color: var(--color-primary);
-  }
-
-  .more-toggle:active {
-    transform: scale(0.99);
-  }
-
-  .more-chev {
-    display: inline-flex;
-    color: var(--color-primary);
-    margin-top: 0.15rem;
-    transition: transform 0.18s ease;
-  }
-
-  .more-chev[data-open='true'] {
-    transform: rotate(90deg);
-  }
-
-  .more-label {
-    display: grid;
-    gap: 0.1rem;
-    font-weight: 700;
-    color: var(--color-primary);
-    font-size: 0.95rem;
-  }
-
-  .more-sub {
+  .legend-optional {
     font-weight: 500;
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     color: var(--color-muted);
   }
 
-  .more-body {
-    display: grid;
-    gap: 1.05rem;
+  input.field-error,
+  textarea.field-error {
+    border-color: var(--color-red);
+  }
+
+  .field-error-msg {
+    margin: 0.35rem 0 0;
+    color: var(--color-red);
+    font-size: 0.82rem;
   }
 
   .virtual-note {

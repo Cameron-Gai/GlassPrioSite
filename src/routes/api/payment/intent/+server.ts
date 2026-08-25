@@ -4,6 +4,7 @@ import { env } from '$env/dynamic/private';
 import { resolveFee } from '$lib/server/zoneFee';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { getJobType } from '$lib/data/jobTypes';
+import { payByTextBlockedReason } from '$lib/server/payByText';
 import { createAuthorization, findOrCreateCustomer, getPublishableKey, isStripeConfigured, classifyStripeError, getStripeMode } from '$lib/server/payments/stripe';
 
 /** Operators flip PAYMENT_DEBUG=true (Railway var) to surface the precise failure
@@ -14,7 +15,7 @@ function paymentDebugEnabled(): boolean {
 }
 
 /**
- * POST /api/payment/intent { zip, jobTypeName }
+ * POST /api/payment/intent { zip, jobTypeName, propertyType? }
  *
  * Re-resolves the fee server-side (authoritative — the amount is never taken
  * from the client) and, when a charge is due and Stripe is configured, creates a
@@ -24,9 +25,10 @@ function paymentDebugEnabled(): boolean {
  * paymentRequired:false so the wizard skips the card step.
  */
 export const POST: RequestHandler = async ({ request }) => {
-  let body: { zip?: string; jobTypeName?: string; street?: string; city?: string; email?: string; name?: string };
+  type Body = { zip?: string; jobTypeName?: string; propertyType?: string; street?: string; city?: string; email?: string; name?: string };
+  let body: Body;
   try {
-    body = (await request.json()) as { zip?: string; jobTypeName?: string; street?: string; city?: string; email?: string; name?: string };
+    body = (await request.json()) as Body;
   } catch {
     throw error(400, 'Invalid JSON payload');
   }
@@ -38,6 +40,20 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const fee = await resolveFee(zip, jobTypeName);
   const debug = paymentDebugEnabled();
+
+  // Whether the wizard may offer "pay later by text" at all. One shared rule
+  // with /api/intake (see $lib/server/payByText) so the offer and the actual
+  // registration can never disagree — most importantly on urgent jobs, where a
+  // texted link would be a second collection on a fee settled at the booking.
+  const payByTextBlocked = payByTextBlockedReason({
+    jobTypeName,
+    propertyType: (body.propertyType ?? '').trim(),
+    oscTextingEnabled: fee.payLaterAvailable
+  });
+  const payLaterAvailable = !payByTextBlocked;
+  if (payByTextBlocked) {
+    console.log(`[api/payment/intent] pay-by-text not offered: ${payByTextBlocked}`, { jobTypeName, zip });
+  }
 
   // Fee semantics from the shared catalog (per Jim 2026-07-16): some job types
   // carry a fixed service fee collected UPFRONT with the OSC (residential
@@ -89,7 +105,7 @@ export const POST: RequestHandler = async ({ request }) => {
       serviced: true,
       zoneName: fee.zoneName,
       flag,
-      payLaterAvailable: fee.payLaterAvailable,
+      payLaterAvailable,
       debug,
       ...(code ? { code } : {}),
       ...(debug ? { stripeMode: getStripeMode() ?? 'legacy', reason } : {}),
@@ -142,7 +158,7 @@ export const POST: RequestHandler = async ({ request }) => {
       clientSecret: auth.clientSecret,
       paymentIntentId: auth.id,
       publishableKey,
-      payLaterAvailable: fee.payLaterAvailable,
+      payLaterAvailable,
       debug,
       ...(debug ? { stripeMode: getStripeMode() ?? 'legacy' } : {}),
     });

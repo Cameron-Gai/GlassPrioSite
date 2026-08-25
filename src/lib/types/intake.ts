@@ -134,6 +134,14 @@ export interface IssueDetails {
   isSecure: boolean;
   hasBrokenGlass: boolean;
   hasWaterOrWeatherEntry: boolean;
+  /**
+   * Fogging or moisture BETWEEN the panes — the insulated-glass seal has failed
+   * (owner request 2026-08-06; CHANNEL PARITY with GlassReports' phone intake).
+   * Worth its own flag rather than leaving it in the description: it tells
+   * dispatch this is an IGU replacement, not a broken-pane job, which changes
+   * what goes on the truck.
+   */
+  hasFailedSeal: boolean;
   windowAccess: WindowAccessInfo;
   photos: UploadedPhoto[];
   categoryDetails: CategoryDetails;

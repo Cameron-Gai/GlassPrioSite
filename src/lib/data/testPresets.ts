@@ -90,6 +90,7 @@ export const testPresets: IntakePreset[] = [
     issue: {
       serviceLocation: 'Front entrance',
       description: 'TEST submission — please disregard / delete. Storefront door + glass replacement.',
+      happenedAt: 'Last month',
       categoryDetails: { storefrontScope: 'Full system', doorOperational: 'no' }
     },
     schedulingPreference: 'flexible'
@@ -124,6 +125,7 @@ export const testPresets: IntakePreset[] = [
     issue: {
       serviceLocation: 'Primary bathroom',
       description: 'TEST submission — please disregard / delete. Frameless enclosure quote.',
+      happenedAt: 'Planning a remodel',
       categoryDetails: { showerMirrorType: 'Frameless shower', approximateSize: '60in x 72in' }
     },
     schedulingPreference: 'flexible'

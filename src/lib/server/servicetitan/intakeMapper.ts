@@ -179,28 +179,54 @@ function toAscii(text: string): string {
     .replace(/[^\x20-\x7E\n]/g, '');
 }
 
-/** One-line on-site consultation charge summary for the CSR (always present in the booking notes). */
+/**
+ * One-line charge summary for the CSR (always present in the booking notes).
+ *
+ * Everything here is stated in terms of the COLLECTIBLE — the zone OSC plus any
+ * upfront service fee — not the zone OSC alone. That distinction is load-bearing
+ * (parity with GlassReports' feeLine, 2026-07-30): a fee-only job (residential
+ * hardware is $0 zone OSC + a $350 service fee) used to fall past every branch
+ * below and print "none for this service", so dispatch was told nothing was
+ * charged on a booking the customer had just paid — or been promised a text for.
+ * The same slip made the tax note wrong, attributing the whole service fee to
+ * sales tax, because `paidTotal` is the collectible + tax, not the OSC + tax.
+ */
 function feeLine(feeCtx?: BookingFeeContext): string | null {
   if (!feeCtx) return null;
   const zone = feeCtx.zoneName ? ` (Zone ${feeCtx.zoneName})` : '';
-  if (feeCtx.serviced && feeCtx.osc > 0) {
+  const osc = feeCtx.serviced ? feeCtx.osc : 0;
+  // Billed-after fees (net-30) are never collected at intake, so they are not
+  // part of the collectible — only the upfront kind rides the payment.
+  const upfront =
+    !feeCtx.feeBilledAfter && typeof feeCtx.upfrontFee === 'number' ? feeCtx.upfrontFee : 0;
+  const collectible = osc + upfront;
+  // Spell out both parts whenever there are two, so a dispatcher can reconcile
+  // the figure against the zone map without doing the arithmetic themselves.
+  const breakdown =
+    upfront > 0 && osc > 0
+      ? ` ($${osc} on-site charge${zone} + $${upfront} service fee)`
+      : upfront > 0
+        ? ` ($${upfront} service fee; no on-site charge for this service)`
+        : zone;
+
+  if (collectible > 0) {
     if (feeCtx.facilityMaintenance) {
-      return `On-site consultation charge: $${feeCtx.osc}${zone} - FACILITY MAINTENANCE: do NOT collect upfront. Bills against the caller's work order (see the work order line below).`;
+      return `On-site consultation charge: $${collectible}${breakdown} - FACILITY MAINTENANCE: do NOT collect upfront. Bills against the caller's work order (see the work order line below).`;
     }
     if (feeCtx.remoteConsult) {
-      return `On-site consultation charge: $${feeCtx.osc}${zone} - WAIVED, customer opted into a REMOTE consultation. Review the attached photos first; the charge applies only if/when a truck is rolled.`;
+      return `On-site consultation charge: $${collectible}${breakdown} - WAIVED, customer opted into a REMOTE consultation. Review the attached photos first; the charge applies only if/when a truck is rolled.`;
     }
-    if (feeCtx.paid) {
-      const total = feeCtx.paidTotal ?? feeCtx.osc;
-      const tax = Math.round((total - feeCtx.osc) * 100) / 100;
+    if (feeCtx.paid && feeCtx.paymentIntentId) {
+      const total = feeCtx.paidTotal ?? collectible;
+      const tax = Math.round((total - collectible) * 100) / 100;
       const taxNote = tax > 0 ? ` incl. $${tax.toFixed(2)} sales tax` : '';
-      return `On-site consultation charge: $${feeCtx.osc}${zone} - PAID online via Stripe (${feeCtx.paymentIntentId}): $${total.toFixed(2)} collected${taxNote}. Do NOT collect again.`;
+      return `PAID ONLINE: $${collectible}${breakdown} - collected via Stripe (${feeCtx.paymentIntentId}): $${total.toFixed(2)}${taxNote}. Do NOT collect again.`;
     }
     if (feeCtx.deferred) {
       const to = feeCtx.payLaterPhone ? ` to ${feeCtx.payLaterPhone}` : '';
-      return `On-site consultation charge: $${feeCtx.osc}${zone} - customer chose PAY LATER (texting consent given). On conversion to a job, the "OSC Collection" tag is applied and a Stripe payment link is texted${to} to collect before the appointment.`;
+      return `PAY BY TEXT: $${collectible}${breakdown} - customer chose pay-by-text (texting consent given). On conversion to a job, the "OSC Collection" tag is applied and a Stripe payment link is texted${to} to collect before the appointment.`;
     }
-    return `On-site consultation charge: $${feeCtx.osc}${zone} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
+    return `On-site consultation charge: $${collectible}${breakdown} - NOT collected online (${feeCtx.flag}); office to collect at scheduling.`;
   }
   if (!feeCtx.serviced) {
     return `On-site consultation charge: ZIP not found in the service-area map - office to confirm coverage and quote the fee.`;
@@ -224,8 +250,23 @@ function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): 
     if (feeCtx.deferred) {
       data.push({ key: 'osc_paylater', value: 'true' });
       if (feeCtx.payLaterPhone) data.push({ key: 'osc_paylater_phone', value: feeCtx.payLaterPhone });
+      // The full promised collectible (zone OSC + upfront service fee), so the
+      // conversion screen sees the amount even on a fee-only job where the zone
+      // carries no OSC. Parity with GlassReports' buildExternalData.
+      const upfront =
+        !feeCtx.feeBilledAfter && typeof feeCtx.upfrontFee === 'number' ? feeCtx.upfrontFee : 0;
+      const total = (feeCtx.serviced ? feeCtx.osc : 0) + upfront;
+      if (total > 0) data.push({ key: 'osc_paylater_amount', value: String(total) });
     }
     if (feeCtx.remoteConsult) data.push({ key: 'osc_remote_consult', value: 'true' });
+  }
+  // Preserve the on-site contact structurally, not only in the Access prose —
+  // including when they have no (distinct) phone, which used to survive nowhere
+  // but the note text. Parity with GlassReports' buildExternalData.
+  if (payload.onSiteContact.differs) {
+    const oc = payload.onSiteContact;
+    const parts = [oc.name.trim(), oc.phone.trim()].filter(Boolean);
+    if (parts.length) data.push({ key: 'on_site_contact', value: parts.join(' ') });
   }
   // Facility-maintenance linkage: the work order is what the job bills against.
   if (payload.propertyType === 'Facility maintenance') {
@@ -369,6 +410,10 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   if (!payload.issueDetails.isSecure) flags.push('Opening NOT secure');
   if (payload.issueDetails.hasBrokenGlass) flags.push('Broken glass on site');
   if (payload.issueDetails.hasWaterOrWeatherEntry) flags.push('Water / weather entering');
+  // Spelled out rather than just "Failed seal" — dispatch reads this line cold,
+  // and the consequence (an IGU replacement, not a broken pane) is the part that
+  // matters to them.
+  if (payload.issueDetails.hasFailedSeal) flags.push('Failed seal - fogging/moisture between the panes (IGU)');
   if (flags.length) lines.push(`Site flags: ${flags.join(', ')}`);
 
   const timing = schedulingLine(payload.schedulingPreference);

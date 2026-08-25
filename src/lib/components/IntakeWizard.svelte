@@ -22,6 +22,7 @@
   import SchedulingPreferenceForm from './SchedulingPreferenceForm.svelte';
   import ReviewSubmission from './ReviewSubmission.svelte';
   import ConfirmationScreen from './ConfirmationScreen.svelte';
+  import BugReportButton from './BugReportButton.svelte';
 
   const SUPPORT_PHONE = '(206) 508-2444';
   const SUPPORT_PHONE_HREF = 'tel:+12065082444';
@@ -47,8 +48,15 @@
       case 'property-type':
         return !!state.propertyType;
       case 'issue':
-        // All issue-step fields are optional by design.
-        return true;
+        // The description, where, and when are REQUIRED (owner request
+        // 2026-08-25 — these used to hide behind an optional "Add more detail"
+        // fold, and bookings arrived too thin to dispatch). Window access
+        // stays optional: it doesn't apply to every service.
+        return (
+          state.issueDetails.description.trim() !== '' &&
+          state.issueDetails.serviceLocation.trim() !== '' &&
+          state.issueDetails.happenedAt.trim() !== ''
+        );
       case 'site':
         return !photosRequiredFor(state) || state.issueDetails.photos.length > 0;
       case 'address':
@@ -274,6 +282,11 @@
     state.step !== 'confirmation';
 </script>
 
+<!-- Always mounted, every step (confirmation included) and even on the
+     service-down card — a customer stuck on a broken page is exactly who
+     needs the report button. It also installs the global error listeners. -->
+<BugReportButton />
+
 {#if !serviceReady}
   <div class="down">
     <span class="down-icon" aria-hidden="true">
@@ -379,9 +392,12 @@
     {:else if state.step === 'issue'}
       <header class="screen-head">
         <h2>Tell us what's going on</h2>
-        <p>A sentence or two is plenty — everything on this step is optional.</p>
+        <p>A sentence or two about the problem, plus where it is and when it started.</p>
       </header>
-      <IssueDetailsForm value={state.issueDetails} job={state.selectedJobType} />
+      <IssueDetailsForm value={state.issueDetails} job={state.selectedJobType} showErrors={attempted} />
+      {#if attempted && !isStepValid(state)}
+        <p class="form-error">Please describe the issue, where it is, and when it happened.</p>
+      {/if}
     {:else if state.step === 'site'}
       <header class="screen-head">
         <h2>Access &amp; photos</h2>
