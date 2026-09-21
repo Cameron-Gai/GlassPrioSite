@@ -22,7 +22,7 @@ export const businessHours: BusinessHoursConfig = {
     wednesday: { open: '08:00', close: '17:00' },
     thursday: { open: '08:00', close: '17:00' },
     friday: { open: '08:00', close: '17:00' },
-    saturday: { open: '08:00', close: '17:00' },
+    saturday: null,
     sunday: null
   }
 };

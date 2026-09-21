@@ -36,7 +36,7 @@
     for (let i = 1; out.length < 5 && i <= 14; i++) {
       const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
       const key = WEEKDAY_KEYS[d.getDay()];
-      if (!businessHours.days[key]) continue; // closed that day (Sundays)
+      if (!businessHours.days[key]) continue; // closed that day (weekends)
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
         d.getDate()
       ).padStart(2, '0')}`;
