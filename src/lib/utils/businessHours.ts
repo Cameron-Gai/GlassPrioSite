@@ -75,5 +75,20 @@ export function describeBusinessHours(config: BusinessHoursConfig = defaultConfi
   }
   const sample = config.days[openDays[0]];
   if (!sample) return 'Closed';
-  return `${openDays[0][0].toUpperCase()}${openDays[0].slice(1)}–${openDays[openDays.length - 1][0].toUpperCase()}${openDays[openDays.length - 1].slice(1)}, ${sample.open}–${sample.close} ${config.timezone}`;
+  const first = openDays[0];
+  const last = openDays[openDays.length - 1];
+  const days = first === last ? shortDay(first) : `${shortDay(first)}–${shortDay(last)}`;
+  return `${days} ${friendlyTime(sample.open)}–${friendlyTime(sample.close)}`;
+}
+
+function shortDay(day: WeekdayKey): string {
+  return `${day[0].toUpperCase()}${day.slice(1, 3)}`;
+}
+
+/** "08:00" → "8am", "17:30" → "5:30pm". */
+function friendlyTime(time: string): string {
+  const [h, m] = time.split(':').map((value) => parseInt(value, 10));
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  const minutes = m ? `:${String(m).padStart(2, '0')}` : '';
+  return `${hour12}${minutes}${h < 12 ? 'am' : 'pm'}`;
 }
