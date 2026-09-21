@@ -46,13 +46,11 @@ interface ListEnvelope<T> {
   data?: T[];
 }
 
-// TODO(memberships): this operation sells ServiceTitan Memberships, but the intake
-// neither checks for nor surfaces a matched customer's membership status. A
-// returning member currently gets no recognition, member pricing, or member
-// benefit here. Future work: on a confirmed match, fetch memberships
-// (memberships/v2 customers/{id}/memberships) and surface active-member status +
-// any member OSC/pricing to the customer and onto the booking. Coordinate with the
-// GlassReports OSC/zone pipeline so member pricing is authoritative server-side.
+// MEMBERSHIPS: a confirmed returning customer's active plan is looked up in
+// ./memberships.ts and surfaced as RECOGNITION — a member greeting on the contact
+// step and an ACTIVE MEMBER flag on the booking. It deliberately does not touch
+// pricing; see that file for why (no member OSC exists, and ServiceTitan applies
+// plan discounts itself at invoice time).
 
 export interface ReturningLookupInput {
   phone: string;

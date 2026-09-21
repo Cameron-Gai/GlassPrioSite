@@ -6,7 +6,7 @@
   import type { IntakeState } from '$lib/stores/intakeStore';
   import { formatUsPhoneInput } from '$lib/utils/phone';
   import { reportClientError } from '$lib/stores/errorLog';
-  import PhotoUploadMock from './PhotoUploadMock.svelte';
+  import PhotoUpload from './PhotoUpload.svelte';
 
   export let state: IntakeState;
 
@@ -424,7 +424,7 @@
           We'll review your photos first and only charge the {money(amount)} if we need to send a
           technician on-site. At least one photo is required.
         </p>
-        <PhotoUploadMock photos={state.issueDetails.photos} />
+        <PhotoUpload photos={state.issueDetails.photos} />
         {#if remoteError}<p class="pay-error">{remoteError}</p>{/if}
         {#if payError}<p class="pay-error">{payError}</p>{/if}
         <button

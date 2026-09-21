@@ -13,6 +13,8 @@
  * The env var form lets ops change IDs without a deploy. Example:
  *   SERVICETITAN_JOB_TYPE_IDS='{"Priority Service (Business Hours)":1234, ...}'
  */
+import { jobTypeNameCandidates } from '$lib/data/jobTypes';
+
 export const DEFAULT_JOB_TYPE_ID_MAP: Record<string, number | null> = {
   'Priority Service (Business Hours)': null,
   'Emergency Services (After Hours)': null,
@@ -25,7 +27,7 @@ export const DEFAULT_JOB_TYPE_ID_MAP: Record<string, number | null> = {
   'Pet Door - Consultation': null,
   'Custom Shower Enclosure - Consultation': null,
   'Custom Mirrors - Consultation': null,
-  'Hardware Service Consultation - Residential': null,
+  'Hardware Service & Diagnostic Consultation - Residential': null,
   'Hardware Service & Diagnostic Consultation - Commercial': null,
   'Multiservice Consultation': null,
   'Advanced Measurement System (AMS)': null,
@@ -41,12 +43,19 @@ export function resolveJobTypeId(
   jobTypeName: string,
   overrides: Record<string, number> | null
 ): JobTypeResolution {
-  if (overrides && typeof overrides[jobTypeName] === 'number') {
-    return { id: overrides[jobTypeName], source: 'env' };
+  // Both maps are keyed by NAME and outlive ServiceTitan renames — search under
+  // the current name, then any former one (both hardware types were renamed
+  // in 2026; the Railway SERVICETITAN_JOB_TYPE_IDS keys still carry the old).
+  for (const candidate of jobTypeNameCandidates(jobTypeName)) {
+    if (overrides && typeof overrides[candidate] === 'number') {
+      return { id: overrides[candidate], source: 'env' };
+    }
   }
-  const fromDefault = DEFAULT_JOB_TYPE_ID_MAP[jobTypeName];
-  if (typeof fromDefault === 'number') {
-    return { id: fromDefault, source: 'default' };
+  for (const candidate of jobTypeNameCandidates(jobTypeName)) {
+    const fromDefault = DEFAULT_JOB_TYPE_ID_MAP[candidate];
+    if (typeof fromDefault === 'number') {
+      return { id: fromDefault, source: 'default' };
+    }
   }
   return { id: null, source: 'missing' };
 }

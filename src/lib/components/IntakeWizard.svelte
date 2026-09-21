@@ -450,6 +450,7 @@
       {:else if state.returning.status === 'applied'}
         <p class="rc-line applied" aria-live="polite">
           ✓ Linked to your account{#if state.returning.firstName}, {state.returning.firstName}{/if} — we filled in any blanks. Double-check it's right, then continue.
+          {#if state.returning.membershipPlan}<br /><strong>{state.returning.membershipPlan} member</strong> — thank you. We'll make sure your member benefits are applied.{/if}
         </p>
       {/if}
     {:else if state.step === 'scheduling'}

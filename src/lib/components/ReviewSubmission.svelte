@@ -1,7 +1,7 @@
 <script lang="ts">
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PaymentStep from './PaymentStep.svelte';
-  import PhotoUploadMock from './PhotoUploadMock.svelte';
+  import PhotoUpload from './PhotoUpload.svelte';
   import { intakeStore, type IntakeState, type WizardStep } from '$lib/stores/intakeStore';
   import { describeTiming } from '$lib/utils/timing';
   import { propertyTypeLabel } from '$lib/types/intake';
@@ -142,7 +142,7 @@
       <button type="button" class="edit" on:click={() => edit('address')}>Edit</button>
     </h3>
     <p>
-      {state.address.street}<br />
+      {state.address.street}{state.address.unit ? `, ${state.address.unit}` : ''}<br />
       {state.address.city}, {state.address.state} {state.address.zip}
     </p>
   </section>
@@ -172,7 +172,7 @@
     {#if state.isEmergency}
       <!-- The emergency fast-track skips the photo step, so offer it here. -->
       <p class="muted small">Optional — a quick photo of the damage helps our crew come prepared.</p>
-      <PhotoUploadMock photos={state.issueDetails.photos} />
+      <PhotoUpload photos={state.issueDetails.photos} />
     {:else if state.issueDetails.photos.length === 0}
       <p class="muted">No photos uploaded.</p>
     {:else}

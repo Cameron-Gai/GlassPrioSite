@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { getServiceTitanConfig, findReturningCustomer, type ReturningLookupInput } from '$lib/server/servicetitan';
+import { getServiceTitanConfig, findReturningCustomer, getActiveMembership, type ReturningLookupInput } from '$lib/server/servicetitan';
 import { rateLimit } from '$lib/server/rateLimit';
 
 /** Coerce a request body into the returning-lookup input shape (all fields optional). */
@@ -44,13 +44,17 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   try {
     const match = await findReturningCustomer(config, parseInput(body));
     if (!match) return json({ matched: false });
+    // Revealed only here — after the customer opted in AND the two-factor match
+    // was re-validated — never from the anonymous first-pass lookup.
+    const membership = await getActiveMembership(config, match.customerId);
     return json({
       matched: true,
       prefill: {
         firstName: match.firstName,
         lastName: match.lastName,
         customerId: match.customerId,
-        locationId: match.locationId
+        locationId: match.locationId,
+        membershipPlan: membership?.planName ?? null
       }
     });
   } catch (error) {

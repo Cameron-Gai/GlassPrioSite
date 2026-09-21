@@ -1,7 +1,7 @@
 <script lang="ts">
   import { intakeStore } from '$lib/stores/intakeStore';
   import { formatUsPhoneInput } from '$lib/utils/phone';
-  import PhotoUploadMock from './PhotoUploadMock.svelte';
+  import PhotoUpload from './PhotoUpload.svelte';
   import type { SpecialInstructions, UploadedPhoto } from '$lib/types/intake';
 
   export let special: SpecialInstructions;
@@ -124,7 +124,7 @@
     {:else}
       <p class="hint">Photos help our team triage and quote faster.</p>
     {/if}
-    <PhotoUploadMock {photos} />
+    <PhotoUpload {photos} />
     {#if showErrors && errors.photos}
       <p class="error">Please add at least one photo to continue.</p>
     {/if}

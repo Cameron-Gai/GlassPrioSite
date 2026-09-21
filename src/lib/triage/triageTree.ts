@@ -329,7 +329,7 @@ export const triageTree: Record<string, TriageNode> = {
       {
         id: 'hardware-residential',
         label: 'Residential',
-        routeJobTypeName: 'Hardware Service Consultation - Residential'
+        routeJobTypeName: 'Hardware Service & Diagnostic Consultation - Residential'
       },
       {
         id: 'hardware-commercial',
@@ -339,7 +339,7 @@ export const triageTree: Record<string, TriageNode> = {
       {
         id: 'hardware-unsure',
         label: "I'm not sure",
-        routeJobTypeName: 'Hardware Service Consultation - Residential'
+        routeJobTypeName: 'Hardware Service & Diagnostic Consultation - Residential'
       }
     ]
   },

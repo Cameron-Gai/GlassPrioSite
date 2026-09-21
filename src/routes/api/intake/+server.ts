@@ -6,6 +6,7 @@ import {
   ServiceTitanError,
   submitIntakeToServiceTitan,
   customerTypeForPropertyType,
+  getActiveMembership,
   type BookingFeeContext
 } from '$lib/server/servicetitan';
 import { publicOrigin, savePhotos } from '$lib/server/photoStorage';
@@ -242,6 +243,15 @@ export const POST: RequestHandler = async ({ request, url }) => {
   };
 
   const config = getServiceTitanConfig();
+
+  // Member recognition for the OFFICE: flag an active plan on the booking note.
+  // Looked up server-side from the linked customer id and never echoed back to
+  // the browser from here — the customer-facing reveal happens only on
+  // /api/customer-prefill, after its two-factor re-check. Changes no pricing.
+  if (config && payload.returningCustomer?.matched && payload.returningCustomer.customerId) {
+    const membership = await getActiveMembership(config, payload.returningCustomer.customerId);
+    feeCtx.memberPlan = membership?.planName ?? null;
+  }
 
   // Create the booking (real or, when ServiceTitan isn't configured, a mock
   // confirmation so the wizard works end-to-end in dev). Capture the payment

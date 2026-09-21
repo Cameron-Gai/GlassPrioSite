@@ -29,6 +29,16 @@
     />
     {#if showErrors && errors.street}<p class="error">Required</p>{/if}
   </div>
+  <div>
+    <label for="unit">Apt, suite, or unit <span class="optional">optional</span></label>
+    <input
+      id="unit"
+      type="text"
+      autocomplete="address-line2"
+      value={value.unit ?? ''}
+      on:input={(event) => update('unit', event.currentTarget.value)}
+    />
+  </div>
   <div class="row two">
     <div>
       <label for="city">City</label>

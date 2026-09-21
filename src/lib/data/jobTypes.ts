@@ -254,11 +254,9 @@ export const jobTypes: JobType[] = [
     consultationFormat: 'on-site'
   },
   {
-    // NOTE: live ServiceTitan still names this 'Hardware Service Consultation -
-    // Residential' (checked 2026-07-15) — only the commercial twin was renamed
-    // there. Keep this internal name until ST renames; customerLabel carries
-    // the new customer-facing wording.
-    name: 'Hardware Service Consultation - Residential',
+    // ServiceTitan's live name (verified against the job-types API 2026-09-21).
+    // The pre-rename name survives as an alias — see JOB_TYPE_NAME_ALIASES.
+    name: 'Hardware Service & Diagnostic Consultation - Residential',
     priority: 'Normal',
     duration: '1 hour 30 minutes',
     category: 'hardware',
@@ -484,8 +482,38 @@ export const jobTypes: JobType[] = [
   }
 ];
 
+
+/**
+ * Former ServiceTitan names, keyed by the CURRENT name. ServiceTitan renamed
+ * both hardware types in 2026 ("… & Diagnostic …"), but the old names live on
+ * in three places that outlast a code change: the Railway
+ * SERVICETITAN_JOB_TYPE_IDS maps (keyed by name), the zone-map catalog, and
+ * drafts saved in a browser. Everything that looks a job type up by name goes
+ * through these aliases, so neither direction of staleness breaks a booking.
+ */
+export const JOB_TYPE_NAME_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  'Hardware Service & Diagnostic Consultation - Residential': ['Hardware Service Consultation - Residential'],
+  'Hardware Service & Diagnostic Consultation - Commercial': ['Hardware Service Consultation - Commercial']
+};
+
+/** The current name for `name` — itself, unless it's a known former name. */
+export function canonicalJobTypeName(name: string): string {
+  for (const [current, formers] of Object.entries(JOB_TYPE_NAME_ALIASES)) {
+    if (formers.includes(name)) return current;
+  }
+  return name;
+}
+
+/** Every name a job type may be keyed under, current name first. */
+export function jobTypeNameCandidates(name: string): string[] {
+  const current = canonicalJobTypeName(name);
+  return [current, ...(JOB_TYPE_NAME_ALIASES[current] ?? [])];
+}
+
 export function getJobType(name: string): JobType {
-  const job = jobTypes.find((entry) => entry.name === name);
+  // Tolerates a former name (a saved draft, an old env key) — see the aliases.
+  const current = canonicalJobTypeName(name);
+  const job = jobTypes.find((entry) => entry.name === current);
   if (!job) {
     throw new Error(`Unknown ServiceTitan job type: ${name}`);
   }

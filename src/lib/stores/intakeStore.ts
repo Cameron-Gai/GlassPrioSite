@@ -106,6 +106,8 @@ export interface IntakeState {
     firstName: string | null;
     customerId: number | null;
     locationId: number | null;
+    /** Active plan name for a confirmed returning member (recognition only). */
+    membershipPlan?: string | null;
   };
 }
 
@@ -181,7 +183,7 @@ function initialState(): IntakeState {
     priorityUpgrade: false,
     customer: { firstName: '', lastName: '', phone: '', email: '' },
     // State prefills to WA — virtually every customer is local (editable).
-    address: { street: '', city: '', state: 'WA', zip: '' },
+    address: { street: '', unit: '', city: '', state: 'WA', zip: '' },
     propertyType: '',
     propertyDetails: { businessName: '', complexName: '', role: '', facilityCompany: '', workOrderNumber: '' },
     onSiteContact: { differs: false, name: '', phone: '' },
@@ -625,6 +627,7 @@ function createIntakeStore() {
           lastName: string;
           customerId: number | null;
           locationId: number | null;
+          membershipPlan?: string | null;
           address: { street: string; city: string; state: string; zip: string } | null;
         };
       };
@@ -645,7 +648,8 @@ function createIntakeStore() {
           status: 'applied',
           firstName: p.firstName || s.returning.firstName,
           customerId: p.customerId ?? null,
-          locationId: p.locationId ?? null
+          locationId: p.locationId ?? null,
+          membershipPlan: p.membershipPlan ?? null
         }
       }));
     } catch {

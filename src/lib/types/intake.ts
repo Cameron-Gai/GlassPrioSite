@@ -78,6 +78,9 @@ export interface CustomerInfo {
 
 export interface AddressInfo {
   street: string;
+  /** Apt / suite / unit — maps to ServiceTitan's address unit. Optional.
+   *  CHANNEL PARITY: the employee phone intake has collected this all along. */
+  unit: string;
   city: string;
   state: string;
   zip: string;

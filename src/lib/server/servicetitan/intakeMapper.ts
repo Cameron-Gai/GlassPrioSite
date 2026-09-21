@@ -43,6 +43,9 @@ export interface BookingFeeContext {
   /** Facility maintenance company: nothing is collected upfront — the job bills
    *  against their work order (same model as the phone channel). */
   facilityMaintenance?: boolean;
+  /** Active ServiceTitan plan held by the confirmed returning customer — a flag
+   *  for the office; it changes nothing the site charges (see memberships.ts). */
+  memberPlan?: string | null;
 }
 
 /**
@@ -120,6 +123,9 @@ function normalizePhone(raw: string): string {
 function buildAddress(payload: IntakePayload): STBookingAddress {
   return {
     street: payload.address.street.trim(),
+    // Optional suite/apt — omitted entirely when blank (parity with the
+    // employee tool's booking write).
+    ...(payload.address.unit?.trim() ? { unit: payload.address.unit.trim() } : {}),
     city: payload.address.city.trim(),
     state: payload.address.state.trim(),
     zip: payload.address.zip.trim(),
@@ -284,6 +290,7 @@ function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): 
   const rc = payload.returningCustomer;
   if (rc?.matched) {
     data.push({ key: 'returning_customer', value: 'true' });
+    if (feeCtx?.memberPlan) data.push({ key: 'member_plan', value: feeCtx.memberPlan });
     if (rc.customerId) data.push({ key: 'st_customer_id', value: String(rc.customerId) });
     if (rc.locationId) data.push({ key: 'st_location_id', value: String(rc.locationId) });
   }
@@ -329,6 +336,9 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
     lines.push(
       `RETURNING CUSTOMER - please link to existing ServiceTitan ${ids.length ? ids.join(', ') : 'record'} on conversion (matched by 2+ of phone/email/name/address).`
     );
+  }
+  if (feeCtx?.memberPlan) {
+    lines.push(`ACTIVE MEMBER: ${feeCtx.memberPlan} - honor member benefits when scheduling and invoicing.`);
   }
   if (payload.routing.isEmergency) {
     lines.push(

@@ -36,7 +36,8 @@ export interface IntakePreset {
   propertyType: PropertyType;
   propertyDetails?: Partial<PropertyDetails>;
   customer: CustomerInfo;
-  address: AddressInfo;
+  /** `unit` is optional on presets — the store merges over a blank default. */
+  address: Omit<AddressInfo, 'unit'> & { unit?: string };
   /** Merged over the default issue details (nested objects merge too). */
   issue?: Partial<IssueDetails>;
   special?: Partial<SpecialInstructions>;
