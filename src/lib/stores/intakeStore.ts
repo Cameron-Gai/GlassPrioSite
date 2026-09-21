@@ -157,19 +157,6 @@ export function stepsFor(state: Pick<IntakeState, 'isEmergency'>): WizardStep[] 
   return state.isEmergency ? EMERGENCY_STEP_ORDER : STEP_ORDER;
 }
 
-export interface PhaseDef {
-  id: string;
-  label: string;
-  steps: WizardStep[];
-}
-
-export const PHASES: PhaseDef[] = [
-  { id: 'tell-us', label: 'Tell us', steps: ['triage'] },
-  { id: 'details', label: 'Details', steps: ['property-type', 'issue', 'site'] },
-  { id: 'you', label: 'About you', steps: ['address', 'contact'] },
-  { id: 'finish', label: 'Finish', steps: ['scheduling', 'review'] }
-];
-
 function initialState(): IntakeState {
   return {
     step: 'triage',
@@ -985,7 +972,3 @@ export const currentTriageNode = derived(intakeStore, ($state): TriageNode | nul
   // falls back to the root question instead.
   return triageTree[$state.currentNodeId] ?? getNode(TRIAGE_ROOT_ID);
 });
-
-export const currentPhaseIndex = derived(intakeStore, ($state) =>
-  PHASES.findIndex((phase) => phase.steps.includes($state.step))
-);

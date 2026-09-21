@@ -3,15 +3,12 @@
   import {
     intakeStore,
     currentTriageNode,
-    currentPhaseIndex,
     STEP_ORDER,
-    stepsFor,
     type WizardStep,
     type IntakeState
   } from '$lib/stores/intakeStore';
   import { testPresets } from '$lib/data/testPresets';
   import QuestionCard from './QuestionCard.svelte';
-  import PhaseStepper from './PhaseStepper.svelte';
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PropertyTypeForm from './PropertyTypeForm.svelte';
   import IssueDetailsForm from './IssueDetailsForm.svelte';
@@ -254,20 +251,9 @@
   $: state = $intakeStore;
   $: onStepChange(state.step);
   $: node = $currentTriageNode;
-  $: phaseIdx = $currentPhaseIndex;
   // Remount (and re-animate) the pane per step — and per triage node, since
   // triage questions swap without a step change.
   $: paneKey = state.step === 'triage' ? `triage:${state.currentNodeId}` : state.step;
-  // Overall progress, mildly front-loaded (^0.75): early steps register as
-  // slightly bigger jumps so the form never feels long after a page or two,
-  // without lying outright about how far along they are. Answering the first
-  // triage question counts as a half-step so the bar moves on the very first tap.
-  $: stepOrder = stepsFor(state);
-  $: rawIdx =
-    state.step === 'triage' && state.triageHistory.length > 0
-      ? 0.5
-      : Math.max(0, stepOrder.indexOf(state.step));
-  $: progress = Math.pow(rawIdx / (stepOrder.length - 1), 0.75);
   $: photosRequired = photosRequiredFor(state);
   $: scheduleLookup(state);
   $: trackSlow(state.returning.status);
@@ -337,17 +323,14 @@
   {/if}
 
   {#if state.step !== 'confirmation'}
-    <div class="head">
-      <PhaseStepper currentIndex={phaseIdx} />
-      <div class="progress-track" aria-hidden="true">
-        <div class="progress-fill" style="width: {(progress * 100).toFixed(1)}%"></div>
-      </div>
-      <div class="step-row">
-        <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
-        {#if state.step === 'triage' && state.triageHistory.length === 0}
-          <p class="time-note">Takes about 2 minutes</p>
-        {/if}
-      </div>
+    <!-- No step count, stepper, or progress meter — by owner decision the form
+         never shows how much is left (see BrandPanel). The label stays as the
+         focus target that announces each step change. -->
+    <div class="step-row">
+      <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
+      {#if state.step === 'triage' && state.triageHistory.length === 0}
+        <p class="time-note">Takes about 2 minutes</p>
+      {/if}
     </div>
   {/if}
 
@@ -524,6 +507,14 @@
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
+    /* Step changes scroll the wizard to the top — clear the sticky brand band. */
+    scroll-margin-top: 7.5rem;
+  }
+
+  @media (min-width: 960px) {
+    .wizard {
+      scroll-margin-top: 2rem;
+    }
   }
 
   /* ServiceTitan-down fallback — the whole form is replaced with a call-us card. */
@@ -639,25 +630,6 @@
     color: var(--color-muted);
   }
 
-  .head {
-    display: grid;
-    gap: 0.45rem;
-  }
-
-  .progress-track {
-    height: 4px;
-    border-radius: 999px;
-    background: var(--color-primary-soft);
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    border-radius: 999px;
-    background: var(--color-primary-gradient);
-    transition: width 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
-  }
-
   .step-row {
     display: flex;
     align-items: baseline;
@@ -709,9 +681,11 @@
 
   .step-label {
     margin: 0;
-    color: var(--color-text);
-    font-weight: 600;
-    font-size: 0.95rem;
+    color: var(--color-muted);
+    font-weight: 700;
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 
   .step-body {
