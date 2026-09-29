@@ -16,8 +16,8 @@
 </svelte:head>
 
 <div class="page">
-  <div class="side">
-    <BrandPanel {openNow} {hoursDescription} />
+  <div class="band">
+    <BrandPanel {openNow} />
   </div>
 
   <main>
@@ -26,6 +26,11 @@
     </section>
 
     <footer class="foot">
+      <ul class="trust">
+        <li>You see any visit charge before you submit</li>
+        <li>A real person confirms your appointment</li>
+        <li>Emergencies are dispatched the same day</li>
+      </ul>
       <p>Business hours: {hoursDescription}</p>
       <p class="emergency-line">
         Active life-safety emergency? Call 911 first, then submit the form.
@@ -35,8 +40,9 @@
 </div>
 
 <style>
-  /* Split layout: the brand panel is a full-height sticky column beside the
-     form. Below 960px it folds into a slim sticky band above it. */
+  /* One thing at a time: a slim sticky brand band, then a single centered
+     column where the current question is the headline. Same shape at every
+     width — desktop just gets more air and a card-less form. */
   .page {
     min-height: 100vh;
     min-height: 100dvh;
@@ -44,7 +50,7 @@
     flex-direction: column;
   }
 
-  .side {
+  .band {
     position: sticky;
     top: 0;
     z-index: 20;
@@ -75,10 +81,37 @@
     color: var(--color-muted);
     font-size: 0.85rem;
     text-align: center;
+    display: grid;
+    gap: 0.2rem;
   }
 
   .foot p {
-    margin: 0.15rem 0;
+    margin: 0;
+  }
+
+  .trust {
+    list-style: none;
+    margin: 0 0 0.6rem;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 1.1rem;
+  }
+
+  .trust li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .trust li::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-light-blue);
+    flex-shrink: 0;
   }
 
   .emergency-line {
@@ -98,23 +131,12 @@
   }
 
   @media (min-width: 960px) {
-    .page {
-      display: grid;
-      grid-template-columns: minmax(340px, 38%) minmax(0, 1fr);
-      align-items: start;
-    }
-
-    .side {
-      height: 100vh;
-      height: 100dvh;
-    }
-
     main {
-      max-width: 720px;
-      padding: 3rem 2.5rem 3rem;
+      max-width: 660px;
+      padding: 3.5rem 1.5rem 3rem;
     }
 
-    /* The form sits straight on the pane here — the split already frames it. */
+    /* The form sits straight on the page — one question needs no frame. */
     .panel {
       background: none;
       backdrop-filter: none;
@@ -127,8 +149,7 @@
     }
 
     .foot {
-      text-align: left;
-      margin-top: 2.5rem;
+      margin-top: 3rem;
     }
   }
 </style>

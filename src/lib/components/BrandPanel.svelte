@@ -1,12 +1,14 @@
 <script lang="ts">
   /**
-   * The persistent brand side of the split layout. It opens with the promise,
-   * then — as soon as the customer has answered anything — swaps to their
-   * request building up beside "what happens next", so the review step is a
-   * confirmation rather than a surprise.
+   * The slim blue brand band across the top of the intake, at every width.
+   * The form below it asks one thing at a time, so the band stays out of the
+   * way: brand, open/closed, the phone number, and — once the customer has
+   * answered anything — a "Your request" chip that opens their summary and
+   * what happens next, so the review step is a confirmation, not a surprise.
    *
-   * ≥960px it is a full-height sticky column; below that it folds into a slim
-   * sticky band whose summary sits behind a "Details" toggle.
+   * Phones: before any answer the band also carries the headline; the summary
+   * opens inline under the chip. Desktop (≥960px): one row; the headline is
+   * left to the question itself, and the summary drops down as a card.
    *
    * Deliberately shows NO step count, step list, or progress meter (owner
    * decision 2026-09-21): a visible "2 of 8" costs more abandonment than it
@@ -17,13 +19,13 @@
   import { propertyTypeLabel } from '$lib/types/intake';
 
   export let openNow: boolean;
-  export let hoursDescription: string;
 
   const SUPPORT_PHONE = '(206) 508-2444';
   const SUPPORT_PHONE_HREF = 'tel:+12065082444';
   const money = (n: number) => `$${n.toLocaleString()}`;
 
   let expanded = false;
+  let bandEl: HTMLElement | undefined;
 
   $: state = $intakeStore;
   $: job = state.selectedJobType;
@@ -35,6 +37,7 @@
   $: charge = state.feeQuote ?? state.advisoryQuote;
   $: hasAnything = !!job || !!state.propertyType || hasAddress || hasTiming;
   $: done = state.step === 'confirmation';
+  $: if (!hasAnything) expanded = false;
   $: handle = [job ? (job.customerLabel ?? job.name) : '', state.address.city.trim()]
     .filter(Boolean)
     .join(' · ');
@@ -51,10 +54,20 @@
         'You pick a day that suits you',
         'Our office follows up to confirm your appointment'
       ];
+
+  function onWindowClick(event: MouseEvent) {
+    if (expanded && bandEl && !bandEl.contains(event.target as Node)) expanded = false;
+  }
+
+  function onWindowKey(event: KeyboardEvent) {
+    if (expanded && event.key === 'Escape') expanded = false;
+  }
 </script>
 
-<aside class="bp" data-filled={hasAnything}>
-  <div class="bp-top">
+<svelte:window on:click={onWindowClick} on:keydown={onWindowKey} />
+
+<header class="bp" bind:this={bandEl}>
+  <div class="bp-row">
     <div class="brand">
       <span class="reflective-ray" aria-hidden="true">
         <span class="ray ray-red"></span>
@@ -66,133 +79,134 @@
         <span class="brand-sub">a Neighborly company</span>
       </span>
     </div>
-    <a class="call-chip" href={SUPPORT_PHONE_HREF} aria-label="Call {SUPPORT_PHONE}">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
-      </svg>
-      {SUPPORT_PHONE}
-    </a>
+
+    <div class="bp-end">
+      {#if hasAnything}
+        <button
+          type="button"
+          class="handle handle-desk"
+          aria-expanded={expanded}
+          aria-controls="bp-summary"
+          on:click={() => (expanded = !expanded)}
+        >
+          <span class="handle-label">Your request</span>
+          <span class="handle-text">{handle || 'In progress'}</span>
+          <span class="chev" aria-hidden="true">{expanded ? '▴' : '▾'}</span>
+        </button>
+      {/if}
+      <span class="status" data-open={openNow}>
+        <span class="status-dot" aria-hidden="true"></span>
+        {openNow ? 'Open now' : 'After hours — emergencies welcome'}
+      </span>
+      <a class="call-chip" href={SUPPORT_PHONE_HREF} aria-label="Call {SUPPORT_PHONE}">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+        </svg>
+        {SUPPORT_PHONE}
+      </a>
+    </div>
   </div>
 
-  <div class="bp-body">
-    {#if !hasAnything}
-      <div class="promise">
-        <p class="eyebrow">We Fix Your Panes!®</p>
-        <h1>Glass fixed right. Requested in two minutes.</h1>
-        <ul class="trust">
-          <li>You see any visit charge before you submit</li>
-          <li>A real person confirms your appointment</li>
-          <li>Emergencies are dispatched the same day</li>
-        </ul>
-      </div>
-    {:else}
-      <h1 class="sr-only">Glass Doctor — request service</h1>
-      <button
-        type="button"
-        class="handle"
-        aria-expanded={expanded}
-        aria-controls="bp-summary"
-        on:click={() => (expanded = !expanded)}
-      >
-        <span class="handle-text">{handle || 'Your request'}</span>
-        <span class="handle-cue">{expanded ? 'Hide' : 'Details'}</span>
-      </button>
+  {#if !hasAnything}
+    <h1 class="promise">Glass fixed right. Requested in two minutes.</h1>
+  {:else}
+    <h1 class="sr-only">Glass Doctor — request service</h1>
+    <button
+      type="button"
+      class="handle handle-phone"
+      aria-expanded={expanded}
+      aria-controls="bp-summary"
+      on:click={() => (expanded = !expanded)}
+    >
+      <span class="handle-text">{handle || 'Your request'}</span>
+      <span class="handle-cue">{expanded ? 'Hide' : 'Details'}</span>
+    </button>
 
-      <div class="filled" id="bp-summary" data-expanded={expanded}>
-        <section class="sum" aria-label="Your request so far">
-          <h2>Your request</h2>
-          <dl>
-            {#if job}
+    <div class="filled" id="bp-summary" data-expanded={expanded}>
+      <section class="sum" aria-label="Your request so far">
+        <h2>Your request</h2>
+        <dl>
+          {#if job}
+            <div>
+              <dt>Service</dt>
+              <dd>
+                {job.customerLabel ?? job.name}
+                {#if state.isEmergency}<span class="badge">Emergency</span>{/if}
+                {#if state.priorityUpgrade}<span class="badge">Priority</span>{/if}
+              </dd>
+            </div>
+          {/if}
+          {#if state.propertyType}
+            <div>
+              <dt>Property</dt>
+              <dd>
+                {propertyTypeLabel(state.propertyType)}{state.propertyDetails.businessName
+                  ? ` · ${state.propertyDetails.businessName}`
+                  : state.propertyDetails.complexName
+                    ? ` · ${state.propertyDetails.complexName}`
+                    : ''}
+              </dd>
+            </div>
+            {#if state.propertyType === 'Facility maintenance' && state.propertyDetails.workOrderNumber}
               <div>
-                <dt>Service</dt>
-                <dd>
-                  {job.customerLabel ?? job.name}
-                  {#if state.isEmergency}<span class="badge">Emergency</span>{/if}
-                  {#if state.priorityUpgrade}<span class="badge">Priority</span>{/if}
-                </dd>
+                <dt>Work order</dt>
+                <dd>{state.propertyDetails.workOrderNumber}</dd>
               </div>
             {/if}
-            {#if state.propertyType}
-              <div>
-                <dt>Property</dt>
-                <dd>
-                  {propertyTypeLabel(state.propertyType)}{state.propertyDetails.businessName
-                    ? ` · ${state.propertyDetails.businessName}`
-                    : state.propertyDetails.complexName
-                      ? ` · ${state.propertyDetails.complexName}`
-                      : ''}
-                </dd>
-              </div>
-              {#if state.propertyType === 'Facility maintenance' && state.propertyDetails.workOrderNumber}
-                <div>
-                  <dt>Work order</dt>
-                  <dd>{state.propertyDetails.workOrderNumber}</dd>
-                </div>
-              {/if}
-            {/if}
-            {#if state.issueDetails.photos.length > 0}
-              <div>
-                <dt>Photos</dt>
-                <dd>{state.issueDetails.photos.length} attached</dd>
-              </div>
-            {/if}
-            {#if hasAddress}
-              <div>
-                <dt>Address</dt>
-                <dd>
-                  {#if state.address.street.trim()}{state.address.street}{state.address.unit?.trim()
-                      ? `, ${state.address.unit}`
-                      : ''}<br />{/if}
-                  {state.address.city}{state.address.city && state.address.zip ? ', ' : ''}{state.address.zip}
-                </dd>
-              </div>
-            {/if}
-            {#if hasTiming}
-              <div>
-                <dt>Timing</dt>
-                <dd>{timing}</dd>
-              </div>
-            {/if}
-            {#if charge}
-              <div>
-                <dt>Visit charge</dt>
-                <dd>
-                  {#if charge.serviced && charge.osc > 0}
-                    {money(charge.osc)}{charge.zoneName ? ` · ${charge.zoneName}` : ''}
-                  {:else if charge.serviced && charge.flag === 'none'}
-                    None for this service
-                  {:else}
-                    Confirmed before scheduling
-                  {/if}
-                </dd>
-              </div>
-            {/if}
-          </dl>
+          {/if}
+          {#if state.issueDetails.photos.length > 0}
+            <div>
+              <dt>Photos</dt>
+              <dd>{state.issueDetails.photos.length} attached</dd>
+            </div>
+          {/if}
+          {#if hasAddress}
+            <div>
+              <dt>Address</dt>
+              <dd>
+                {#if state.address.street.trim()}{state.address.street}{state.address.unit?.trim()
+                    ? `, ${state.address.unit}`
+                    : ''}<br />{/if}
+                {state.address.city}{state.address.city && state.address.zip ? ', ' : ''}{state.address.zip}
+              </dd>
+            </div>
+          {/if}
+          {#if hasTiming}
+            <div>
+              <dt>Timing</dt>
+              <dd>{timing}</dd>
+            </div>
+          {/if}
+          {#if charge}
+            <div>
+              <dt>Visit charge</dt>
+              <dd>
+                {#if charge.serviced && charge.osc > 0}
+                  {money(charge.osc)}{charge.zoneName ? ` · ${charge.zoneName}` : ''}
+                {:else if charge.serviced && charge.flag === 'none'}
+                  None for this service
+                {:else}
+                  Confirmed before scheduling
+                {/if}
+              </dd>
+            </div>
+          {/if}
+        </dl>
+      </section>
+
+      {#if !done}
+        <section class="next">
+          <h2>What happens next</h2>
+          <ul>
+            {#each nextLines as line (line)}
+              <li>{line}</li>
+            {/each}
+          </ul>
         </section>
-
-        {#if !done}
-          <section class="next">
-            <h2>What happens next</h2>
-            <ul>
-              {#each nextLines as line (line)}
-                <li>{line}</li>
-              {/each}
-            </ul>
-          </section>
-        {/if}
-      </div>
-    {/if}
-  </div>
-
-  <div class="bp-foot">
-    <span class="status" data-open={openNow}>
-      <span class="status-dot" aria-hidden="true"></span>
-      {openNow ? 'Open now' : 'After hours — emergencies welcome'}
-    </span>
-    <p>Rather talk? <a href={SUPPORT_PHONE_HREF}>{SUPPORT_PHONE}</a></p>
-    <p class="hours">{hoursDescription}</p>
-  </div>
-</aside>
+      {/if}
+    </div>
+  {/if}
+</header>
 
 <style>
   .bp {
@@ -211,7 +225,7 @@
   }
 
   /* The brand's Reflective Ray, scaled up into a pane of light across the
-     panel — fixed brand angle, decorative only. */
+     band — fixed brand angle, decorative only. */
   .bp::after {
     content: '';
     position: absolute;
@@ -236,17 +250,25 @@
     z-index: 1;
   }
 
-  .bp-top {
+  .bp-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
   }
 
+  .bp-end {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    min-width: 0;
+  }
+
   .brand {
     display: flex;
     align-items: center;
     gap: 0.55rem;
+    flex-shrink: 0;
   }
 
   .reflective-ray {
@@ -332,22 +354,12 @@
   }
 
   .call-chip:focus-visible,
-  .handle:focus-visible,
-  .bp-foot a:focus-visible {
+  .handle:focus-visible {
     outline: 2px solid #fff;
     outline-offset: 2px;
   }
 
-  .eyebrow {
-    margin: 0;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-light-blue);
-  }
-
-  h1 {
+  .promise {
     margin: 0;
     font-size: 1.15rem;
     line-height: 1.2;
@@ -356,16 +368,9 @@
     text-wrap: balance;
   }
 
-  .promise {
-    display: grid;
-    gap: 0.35rem;
-  }
-
-  /* Phone band keeps the promise to the headline; the reassurances need the
-     room the desktop column has. */
-  .trust,
-  .promise .eyebrow,
-  .bp-foot {
+  /* Phone: status and the one-row chip don't fit; the phone button does. */
+  .status,
+  .handle-desk {
     display: none;
   }
 
@@ -468,20 +473,15 @@
     vertical-align: 1px;
   }
 
-  .next ul,
-  .trust {
+  .next ul {
     list-style: none;
     margin: 0;
     padding: 0;
+    display: grid;
     gap: 0.6rem;
   }
 
-  .next ul {
-    display: grid;
-  }
-
-  .next li,
-  .trust li {
+  .next li {
     display: grid;
     grid-template-columns: 6px minmax(0, 1fr);
     gap: 0.65rem;
@@ -491,8 +491,7 @@
     color: var(--bp-soft);
   }
 
-  .next li::before,
-  .trust li::before {
+  .next li::before {
     content: '';
     width: 6px;
     height: 6px;
@@ -502,13 +501,12 @@
   }
 
   .status {
-    display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    align-self: flex-start;
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--bp-soft);
+    white-space: nowrap;
   }
 
   .status-dot {
@@ -527,27 +525,6 @@
     box-shadow: 0 0 0 4px rgba(96, 175, 230, 0.28);
   }
 
-  .bp-foot p {
-    margin: 0;
-    font-size: 0.86rem;
-    color: var(--bp-soft);
-  }
-
-  .bp-foot a {
-    color: #fff;
-    font-weight: 700;
-    text-decoration: none;
-  }
-
-  .bp-foot a:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  .bp-foot .hours {
-    font-size: 0.76rem;
-  }
-
   .sr-only {
     position: absolute;
     width: 1px;
@@ -561,52 +538,70 @@
   }
 
   @media (min-width: 960px) {
+    /* One slim row. The drop-down summary has to escape the band, so the
+       band stops clipping — and the decorative ray, which relied on that
+       clip, is dropped rather than left to spill past the viewport. */
     .bp {
-      height: 100%;
-      gap: 2rem;
-      justify-content: space-between;
-      /* bottom room for the fixed Report-a-bug button, which sits over this corner */
-      padding: 2.2rem 2.4rem 4.4rem;
-      overflow-y: auto;
+      overflow: visible;
+      padding: 0.85rem clamp(1.5rem, 4vw, 3rem);
+      gap: 0;
     }
 
-    .call-chip,
-    .handle {
+    .bp::after {
       display: none;
     }
 
-    .promise {
-      gap: 1.1rem;
+    .status {
+      display: inline-flex;
     }
 
-    .promise .eyebrow {
-      display: block;
+    /* The question below is the headline on desktop. */
+    .promise,
+    .handle-phone {
+      display: none;
     }
 
-    h1 {
-      font-size: clamp(1.9rem, 2.6vw, 2.6rem);
-      line-height: 1.08;
+    .handle-desk {
+      display: inline-flex;
+      width: auto;
+      max-width: 22rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+      gap: 0.5rem;
     }
 
-    .trust {
+    .handle-label {
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--bp-soft);
+    }
+
+    .chev {
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      color: var(--bp-soft);
+    }
+
+    .filled,
+    .filled[data-expanded='true'] {
+      display: none;
+    }
+
+    .filled[data-expanded='true'] {
       display: grid;
-      margin-top: 0.5rem;
-    }
-
-    .trust li {
-      font-size: 0.98rem;
-    }
-
-    .filled {
-      display: grid;
-      gap: 1.6rem;
-      max-height: none;
-      overflow: visible;
-    }
-
-    .bp-foot {
-      display: grid;
-      gap: 0.35rem;
+      position: absolute;
+      top: calc(100% + 0.5rem);
+      right: clamp(1.5rem, 4vw, 3rem);
+      width: min(24rem, calc(100vw - 3rem));
+      max-height: min(70vh, 34rem);
+      gap: 1.2rem;
+      padding: 1.1rem 1.2rem;
+      border-radius: 16px;
+      background: linear-gradient(160deg, #06038d 0%, #12289b 100%);
+      box-shadow: 0 18px 48px rgba(6, 3, 80, 0.28);
     }
   }
 </style>

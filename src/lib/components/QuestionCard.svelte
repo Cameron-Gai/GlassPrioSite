@@ -142,4 +142,19 @@
       font-size: 1.4rem;
     }
   }
+
+  /* Desktop: the question is the page's headline. */
+  @media (min-width: 960px) {
+    header {
+      text-align: center;
+      justify-items: center;
+    }
+
+    h2 {
+      font-size: 2.1rem;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+    }
+  }
 </style>

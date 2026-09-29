@@ -513,7 +513,28 @@
 
   @media (min-width: 960px) {
     .wizard {
-      scroll-margin-top: 2rem;
+      scroll-margin-top: 6rem;
+    }
+
+    /* One thing at a time: each step's question is centered and large.
+       Scoped under .wizard so these beat the base rules declared later. */
+    .wizard .step-row {
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .wizard .screen-head {
+      text-align: center;
+      justify-items: center;
+      margin-bottom: 1.4rem;
+    }
+
+    .wizard .screen-head h2 {
+      font-size: 2.1rem;
+      line-height: 1.12;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
     }
   }
 
