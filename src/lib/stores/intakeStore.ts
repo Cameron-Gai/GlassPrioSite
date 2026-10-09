@@ -3,6 +3,7 @@ import { browser } from '$app/environment';
 import { businessHours } from '$lib/config/businessHours';
 import { canonicalArrivalWindow } from '$lib/config/arrivalWindows';
 import { isBusinessHours } from '$lib/utils/businessHours';
+import { attribution } from '$lib/attribution';
 import {
   TRIAGE_ROOT_ID,
   getNode,
@@ -836,6 +837,7 @@ function createIntakeStore() {
         customerId: state.returning.status === 'applied' ? state.returning.customerId : null,
         locationId: state.returning.status === 'applied' ? state.returning.locationId : null
       },
+      attribution: get(attribution),
       createdAt: new Date().toISOString()
     };
   }

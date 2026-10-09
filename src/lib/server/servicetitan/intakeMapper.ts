@@ -8,6 +8,7 @@ import type { ServiceTitanConfig } from './config';
 import { resolveJobTypeId } from './jobTypeMap';
 import { ServiceTitanError, stRequest } from './client';
 import { buildBookingStart } from './bookingSchedule';
+import { describeAttribution, sanitizeAttribution } from '$lib/attribution';
 
 /** On-site-charge context resolved from the GlassReports zone map, attached to the booking. */
 export interface BookingFeeContext {
@@ -294,6 +295,9 @@ function buildExternalData(payload: IntakePayload, feeCtx?: BookingFeeContext): 
     if (rc.customerId) data.push({ key: 'st_customer_id', value: String(rc.customerId) });
     if (rc.locationId) data.push({ key: 'st_location_id', value: String(rc.locationId) });
   }
+  // Lead attribution for the advertiser's matchback (re-cleaned: it came off the URL).
+  const attr = sanitizeAttribution(payload.attribution);
+  if (attr) for (const [key, value] of Object.entries(attr)) data.push({ key: key === 'src' ? 'lead_source' : key, value });
   return data.length ? data : undefined;
 }
 
@@ -340,6 +344,8 @@ function buildBookingSummary(payload: IntakePayload, photoUrls: string[], feeCtx
   if (feeCtx?.memberPlan) {
     lines.push(`ACTIVE MEMBER: ${feeCtx.memberPlan} - honor member benefits when scheduling and invoicing.`);
   }
+  const leadSource = describeAttribution(sanitizeAttribution(payload.attribution));
+  if (leadSource) lines.push(`LEAD SOURCE: ${leadSource}.`);
   if (payload.routing.isEmergency) {
     lines.push(
       payload.routing.isDuringBusinessHours

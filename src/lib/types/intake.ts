@@ -200,5 +200,7 @@ export interface IntakePayload {
     customerId: number | null;
     locationId: number | null;
   };
+  /** Where the lead came from (UTM tags / Google click ids) — see $lib/attribution. */
+  attribution?: import('$lib/attribution').Attribution | null;
   createdAt: string;
 }

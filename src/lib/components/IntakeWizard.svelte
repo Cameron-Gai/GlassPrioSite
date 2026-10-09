@@ -21,6 +21,11 @@
   import ConfirmationScreen from './ConfirmationScreen.svelte';
   import BugReportButton from './BugReportButton.svelte';
 
+  /** Running inside an iframe on someone else's page (/embed). The host page
+   *  owns scrolling and the bug-report corner; we report step changes instead. */
+  export let embedded = false;
+  export let onStepChanged: (() => void) | null = null;
+
   const SUPPORT_PHONE = '(206) 508-2444';
   const SUPPORT_PHONE_HREF = 'tel:+12065082444';
 
@@ -217,7 +222,8 @@
     navDir = STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(prevStep) ? 'forward' : 'back';
     prevStep = step;
     tick().then(() => {
-      wizardEl?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
+      if (embedded) onStepChanged?.();
+      else wizardEl?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' });
       stepLabelEl?.focus({ preventScroll: true });
     });
   }
@@ -271,7 +277,7 @@
 <!-- Always mounted, every step (confirmation included) and even on the
      service-down card — a customer stuck on a broken page is exactly who
      needs the report button. It also installs the global error listeners. -->
-<BugReportButton />
+{#if !embedded}<BugReportButton />{/if}
 
 {#if !serviceReady}
   <div class="down">
@@ -286,7 +292,7 @@
   </div>
 {:else}
 <div class="wizard" bind:this={wizardEl}>
-  {#if testMode && state.step === 'triage'}
+  {#if testMode && !embedded && state.step === 'triage'}
     <div class="test-presets">
       <p class="tp-title">🧪 Test mode — quick presets</p>
       <p class="tp-sub">

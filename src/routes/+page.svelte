@@ -2,9 +2,14 @@
   import IntakeWizard from '$lib/components/IntakeWizard.svelte';
   import BrandPanel from '$lib/components/BrandPanel.svelte';
   import { describeBusinessHours, isBusinessHours } from '$lib/utils/businessHours';
+  import { onMount } from 'svelte';
+  import { attribution, readAttribution } from '$lib/attribution';
 
   const hoursDescription = describeBusinessHours();
   const openNow = isBusinessHours();
+
+  // Ad links straight to the site carry their UTM tags / click ids onto the booking too.
+  onMount(() => attribution.set(readAttribution(new URLSearchParams(window.location.search))));
 </script>
 
 <svelte:head>
