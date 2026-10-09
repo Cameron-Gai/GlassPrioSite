@@ -5,6 +5,7 @@ import { resolveFee } from '$lib/server/zoneFee';
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { getJobType } from '$lib/data/jobTypes';
 import { payByTextBlockedReason } from '$lib/server/payByText';
+import { onlinePaymentEnabled } from '$lib/server/payments/onlinePayment';
 import { createAuthorization, findOrCreateCustomer, getPublishableKey, isStripeConfigured, classifyStripeError, getStripeMode } from '$lib/server/payments/stripe';
 
 /** Operators flip PAYMENT_DEBUG=true (Railway var) to surface the precise failure
@@ -48,7 +49,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const payByTextBlocked = payByTextBlockedReason({
     jobTypeName,
     propertyType: (body.propertyType ?? '').trim(),
-    oscTextingEnabled: fee.payLaterAvailable
+    oscTextingEnabled: fee.payLaterAvailable && onlinePaymentEnabled()
   });
   const payLaterAvailable = !payByTextBlocked;
   if (payByTextBlocked) {
@@ -110,6 +111,9 @@ export const POST: RequestHandler = async ({ request }) => {
       ...(code ? { code } : {}),
       ...(debug ? { stripeMode: getStripeMode() ?? 'legacy', reason } : {}),
     });
+  // Office collects every on-site charge for now (OSC_PAY_NOW off) — by design,
+  // so no diagnostic code: this isn't a failure to report.
+  if (!onlinePaymentEnabled()) return collectLater('office-collects');
   if (!isStripeConfigured()) {
     // No (or malformed) Stripe secret key — online collection is off by design.
     return collectLater('payment-not-configured', 'stripe-not-configured', 'STRIPE_SECRET_KEY is unset or malformed on the server.');

@@ -17,6 +17,7 @@ import { captureIntent, cancelIntent, getIntent, updateIntentMetadata } from '$l
 import { lookupWaSalesTax, taxAmountOn } from '$lib/server/waTax';
 import { registerDeferredOsc } from '$lib/server/oscRegister';
 import { payByTextBlockedReason } from '$lib/server/payByText';
+import { onlinePaymentEnabled } from '$lib/server/payments/onlinePayment';
 import { notifyBookingEvent } from '$lib/server/bookingEvent';
 
 function isNonEmptyString(value: unknown): value is string {
@@ -135,7 +136,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   const payByTextBlocked = payByTextBlockedReason({
     jobTypeName: payload.selectedJobType.name,
     propertyType: payload.propertyType,
-    oscTextingEnabled: fee.payLaterAvailable
+    oscTextingEnabled: fee.payLaterAvailable && onlinePaymentEnabled()
   });
   const deferred =
     feeDue && !remoteConsult && !facilityMaintenance && !payByTextBlocked &&

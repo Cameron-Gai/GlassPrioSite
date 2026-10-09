@@ -112,7 +112,7 @@
     if (flag === 'unserviced-or-unknown') {
       return 'We could not match your ZIP to a service area. You can still submit — our office will confirm coverage and any fee when scheduling.';
     }
-    if (flag === 'payment-not-configured' || flag === 'payment-unavailable' || amt > 0) {
+    if (flag === 'office-collects' || flag === 'payment-not-configured' || flag === 'payment-unavailable' || amt > 0) {
       return `An on-site consultation charge of ${money(amt)} applies for your area. Our office will collect it when scheduling.`;
     }
     // We couldn't actually resolve the charge (fee service unreachable / not

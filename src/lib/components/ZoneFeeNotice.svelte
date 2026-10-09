@@ -19,6 +19,8 @@
     osc: number;
     zoneName: string | null;
     flag: string;
+    /** False when the office collects every on-site charge (OSC_PAY_NOW off). */
+    paymentRequired?: boolean;
   };
 
   let status: 'idle' | 'loading' | 'done' = 'idle';
@@ -92,8 +94,13 @@
       </p>
       <p class="sub">
         A <strong>{money(quote.osc)}</strong> on-site consultation charge applies for a technician
-        visit. You'll see payment options at the final step — including a remote consultation with
-        no visit charge.
+        visit.
+        {#if quote.paymentRequired}
+          You'll see payment options at the final step — including a remote consultation with no
+          visit charge.
+        {:else}
+          Nothing to pay online — our office collects it when they call to schedule.
+        {/if}
       </p>
     </div>
   {:else if quote.serviced && quote.flag === 'none'}

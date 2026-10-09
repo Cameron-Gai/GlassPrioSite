@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { resolveFee } from '$lib/server/zoneFee';
 import { isStripeConfigured } from '$lib/server/payments/stripe';
+import { onlinePaymentEnabled } from '$lib/server/payments/onlinePayment';
 
 /**
  * GET /api/quote?zip=&jobTypeName= — the on-site charge for the customer's ZIP +
@@ -16,7 +17,7 @@ export const GET: RequestHandler = async ({ url }) => {
     return json({ error: 'zip and jobTypeName are required' }, { status: 400 });
   }
   const fee = await resolveFee(zip, jobTypeName);
-  const paymentRequired = fee.serviced && fee.osc > 0 && isStripeConfigured();
+  const paymentRequired = fee.serviced && fee.osc > 0 && isStripeConfigured() && onlinePaymentEnabled();
   return json({
     serviced: fee.serviced,
     osc: fee.osc,
