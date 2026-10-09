@@ -267,7 +267,10 @@
     state.step !== 'confirmation' &&
     !state.returnToReview &&
     (state.step !== 'triage' || state.triageHistory.length > 0);
+  // The "Routed to" card is left off the embed: on a partner's landing page
+  // it's a large block that pushes each question below the fold.
   $: showBanner =
+    !embedded &&
     state.selectedJobType &&
     state.step !== 'triage' &&
     state.step !== 'review' &&
