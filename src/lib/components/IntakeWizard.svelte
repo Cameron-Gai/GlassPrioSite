@@ -4,6 +4,7 @@
     intakeStore,
     currentTriageNode,
     STEP_ORDER,
+    stepsFor,
     type WizardStep,
     type IntakeState
   } from '$lib/stores/intakeStore';
@@ -25,6 +26,12 @@
    *  owns scrolling and the bug-report corner; we report step changes instead. */
   export let embedded = false;
   export let onStepChanged: (() => void) | null = null;
+  /** Ad-traffic page (/book) only: a bold progress bar (Jim, 2026-10-09) — the
+   *  main site keeps the no-progress-meter decision. */
+  export let showProgress = false;
+  /** Ad-traffic page (/book) only: a standing "rather talk to a person?" line
+   *  for visitors who won't finish a form (Mike Mancini's ask, 2026-10-09). */
+  export let talkToPerson = false;
 
   const SUPPORT_PHONE = '(206) 508-2444';
   const SUPPORT_PHONE_HREF = 'tel:+12065082444';
@@ -275,6 +282,16 @@
     state.step !== 'triage' &&
     state.step !== 'review' &&
     state.step !== 'confirmation';
+
+  // Share of the form done, for the /book progress bar. Triage is several
+  // questions inside one step, so each answer there nudges the bar too.
+  function progressPct(s: IntakeState): number {
+    const steps: WizardStep[] = stepsFor(s).filter((st) => st !== 'confirmation');
+    const idx = Math.max(0, steps.indexOf(s.step));
+    const within = s.step === 'triage' ? Math.min(s.triageHistory.length, 2) / 3 : 0;
+    return Math.max(4, Math.round(((idx + within) / steps.length) * 100));
+  }
+  $: progress = showProgress ? progressPct(state) : 0;
 </script>
 
 <!-- Always mounted, every step (confirmation included) and even on the
@@ -331,10 +348,24 @@
     </div>
   {/if}
 
+  {#if showProgress && state.step !== 'confirmation'}
+    <div
+      class="progress"
+      role="progressbar"
+      aria-label="Form progress"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={progress}
+    >
+      <div class="progress-fill" style="width: {progress}%"></div>
+    </div>
+  {/if}
+
   {#if state.step !== 'confirmation'}
-    <!-- No step count, stepper, or progress meter — by owner decision the form
-         never shows how much is left (see BrandPanel). The label stays as the
-         focus target that announces each step change. -->
+    <!-- No step count or stepper, and no progress meter on the main site — by
+         owner decision it never shows how much is left (see BrandPanel); only
+         the /book ad page opts into one. The label stays as the focus target
+         that announces each step change. -->
     <div class="step-row">
       <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
       {#if state.step === 'triage' && state.triageHistory.length === 0}
@@ -472,6 +503,14 @@
     </div>
     {/key}
   </form>
+
+  {#if talkToPerson && !state.isEmergency && state.step !== 'confirmation'}
+    <!-- Above the buttons, not below: on phones the button row is sticky and
+         flush with the panel's bottom edge. Emergencies already get the call bar. -->
+    <p class="talk-line">
+      Rather talk to a person? <a href={SUPPORT_PHONE_HREF}>Call {SUPPORT_PHONE}</a>
+    </p>
+  {/if}
 
   {#if state.step !== 'confirmation'}
     {@const atReview = state.step === 'review'}
@@ -665,6 +704,39 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 0.6rem;
+  }
+
+  .progress {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--color-primary-soft);
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary-gradient);
+    transition: width 0.35s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress-fill {
+      transition: none;
+    }
+  }
+
+  .talk-line {
+    margin: 0;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--color-muted);
+  }
+
+  .talk-line a {
+    color: var(--color-text-strong);
+    font-weight: 700;
+    white-space: nowrap;
   }
 
   .time-note {

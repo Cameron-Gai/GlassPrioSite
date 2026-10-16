@@ -345,8 +345,12 @@ function createIntakeStore() {
   /** Called once from the wizard's onMount (browser only): restore a saved draft,
    *  then enable ongoing persistence. Returns true when a mid-flow draft was
    *  actually restored (so the wizard can say so and offer "start over"). */
+  // A page that needs the draft before the wizard mounts (/book reads the
+  // saved ZIP) hydrates first; the wizard's later call still gets the answer.
+  let restoredDraft = false;
   function hydrate(): boolean {
-    if (!browser || persistEnabled) return false;
+    if (!browser) return false;
+    if (persistEnabled) return restoredDraft;
     persistEnabled = true;
     const saved = readPersisted();
     if (!saved) return false;
@@ -354,7 +358,8 @@ function createIntakeStore() {
     store.set(merged);
     // "Restored" only counts when they'd made real progress — a pristine
     // triage screen needs no banner.
-    return merged.step !== 'triage' || merged.triageHistory.length > 0;
+    restoredDraft = merged.step !== 'triage' || merged.triageHistory.length > 0;
+    return restoredDraft;
   }
 
   function selectOption(option: TriageOption) {
