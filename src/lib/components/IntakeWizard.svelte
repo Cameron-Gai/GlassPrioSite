@@ -4,12 +4,13 @@
     intakeStore,
     currentTriageNode,
     STEP_ORDER,
-    stepsFor,
     type WizardStep,
     type IntakeState
   } from '$lib/stores/intakeStore';
   import { testPresets } from '$lib/data/testPresets';
   import QuestionCard from './QuestionCard.svelte';
+  import ZipCheck from './ZipCheck.svelte';
+  import StepProgress from './StepProgress.svelte';
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PropertyTypeForm from './PropertyTypeForm.svelte';
   import IssueDetailsForm from './IssueDetailsForm.svelte';
@@ -26,12 +27,9 @@
    *  owns scrolling and the bug-report corner; we report step changes instead. */
   export let embedded = false;
   export let onStepChanged: (() => void) | null = null;
-  /** Ad-traffic page (/book) only: a bold progress bar (Jim, 2026-10-09) — the
-   *  main site keeps the no-progress-meter decision. */
-  export let showProgress = false;
-  /** Ad-traffic page (/book) only: a standing "rather talk to a person?" line
-   *  for visitors who won't finish a form (Mike Mancini's ask, 2026-10-09). */
-  export let talkToPerson = false;
+
+  /** The first screen asks for the ZIP beside the service tiles. */
+  const FIRST_SCREEN_TITLE = "Where's the job, and what needs fixing?";
 
   const SUPPORT_PHONE = '(206) 508-2444';
   const SUPPORT_PHONE_HREF = 'tel:+12065082444';
@@ -163,9 +161,49 @@
     intakeStore.goBack();
   }
 
+  // The service tiles wait for a served ZIP ('unknown' = the zone map couldn't
+  // answer, so they go through rather than lose the lead).
+  let zipAttempted = false;
+
   function selectTriageOption(option: Parameters<typeof intakeStore.selectOption>[0]) {
+    const s = $intakeStore;
+    if (s.triageHistory.length === 0 && s.areaStatus !== 'in' && s.areaStatus !== 'unknown') {
+      zipAttempted = true;
+      document.getElementById('intake-zip')?.focus();
+      return;
+    }
+    zipAttempted = false;
     navDir = 'forward'; // triage-node advances don't change `step`
     intakeStore.selectOption(option);
+  }
+
+  // The visit charge as soon as the ZIP and job type are both known, for the
+  // summary rail — not just from the address step on. Display only; review
+  // re-resolves it authoritatively.
+  let advisoryKey = '';
+  $: requestAdvisory($intakeStore);
+  async function requestAdvisory(s: IntakeState) {
+    const zip = s.address.zip.trim().slice(0, 5);
+    const job = s.selectedJobType?.name ?? '';
+    if (!/^\d{5}$/.test(zip) || !job || s.advisoryQuote || s.step === 'address') return;
+    const key = `${zip}|${job}`;
+    if (key === advisoryKey) return;
+    advisoryKey = key;
+    try {
+      const res = await fetch(`/api/quote?zip=${encodeURIComponent(zip)}&jobTypeName=${encodeURIComponent(job)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const now = $intakeStore;
+      if (now.address.zip.trim().slice(0, 5) !== zip || now.selectedJobType?.name !== job) return;
+      intakeStore.setAdvisoryQuote({
+        serviced: data.serviced === true,
+        osc: Number(data.osc) || 0,
+        zoneName: data.zoneName ?? null,
+        flag: data.flag ?? 'none'
+      });
+    } catch {
+      /* quiet: one try per ZIP + job; review resolves the charge anyway */
+    }
   }
 
   // Enter (or the mobile keyboard's Go) submits the step like clicking
@@ -253,7 +291,9 @@
       const res = await fetch('/api/config');
       if (res.ok) {
         const cfg = await res.json();
-        testMode = cfg.testMode === true;
+        // Presets only on request (?test on the URL): production has run with
+        // Stripe in test mode, which put this panel in front of real customers.
+        testMode = cfg.testMode === true && new URLSearchParams(window.location.search).has('test');
         serviceReady = cfg.serviceTitanReady !== false;
       }
     } catch {
@@ -282,16 +322,7 @@
     state.step !== 'triage' &&
     state.step !== 'review' &&
     state.step !== 'confirmation';
-
-  // Share of the form done, for the /book progress bar. Triage is several
-  // questions inside one step, so each answer there nudges the bar too.
-  function progressPct(s: IntakeState): number {
-    const steps: WizardStep[] = stepsFor(s).filter((st) => st !== 'confirmation');
-    const idx = Math.max(0, steps.indexOf(s.step));
-    const within = s.step === 'triage' ? Math.min(s.triageHistory.length, 2) / 3 : 0;
-    return Math.max(4, Math.round(((idx + within) / steps.length) * 100));
-  }
-  $: progress = showProgress ? progressPct(state) : 0;
+  $: atFirstScreen = state.step === 'triage' && state.triageHistory.length === 0;
 </script>
 
 <!-- Always mounted, every step (confirmation included) and even on the
@@ -348,30 +379,12 @@
     </div>
   {/if}
 
-  {#if showProgress && state.step !== 'confirmation'}
-    <div
-      class="progress"
-      role="progressbar"
-      aria-label="Form progress"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow={progress}
-    >
-      <div class="progress-fill" style="width: {progress}%"></div>
-    </div>
-  {/if}
+  <StepProgress {state} />
 
   {#if state.step !== 'confirmation'}
-    <!-- No step count or stepper, and no progress meter on the main site — by
-         owner decision it never shows how much is left (see BrandPanel); only
-         the /book ad page opts into one. The label stays as the focus target
-         that announces each step change. -->
-    <div class="step-row">
-      <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
-      {#if state.step === 'triage' && state.triageHistory.length === 0}
-        <p class="time-note">Takes about 2 minutes</p>
-      {/if}
-    </div>
+    <!-- Screen-reader-only: the focus target that announces each step change.
+         The visible orientation is StepProgress above. -->
+    <p class="step-label" tabindex="-1" bind:this={stepLabelEl}>{stepLabels[state.step]}</p>
   {/if}
 
   {#if state.isEmergency && state.step !== 'confirmation'}
@@ -387,12 +400,15 @@
   {/if}
 
   {#if showBanner && state.selectedJobType}
-    <JobTypeBanner
-      job={state.selectedJobType}
-      isEmergency={state.isEmergency}
-      isDuringBusinessHours={state.isDuringBusinessHours}
-      priorityUpgrade={state.priorityUpgrade}
-    />
+    <!-- Phones only: on computers the summary rail already shows the service. -->
+    <div class="banner-phone">
+      <JobTypeBanner
+        job={state.selectedJobType}
+        isEmergency={state.isEmergency}
+        isDuringBusinessHours={state.isDuringBusinessHours}
+        priorityUpgrade={state.priorityUpgrade}
+      />
+    </div>
   {/if}
 
   <!-- A real form so Enter / the mobile keyboard's Go advances the step. All
@@ -402,7 +418,9 @@
     {#key paneKey}
     <div class="step-pane" data-dir={navDir}>
     {#if state.step === 'triage' && node}
-      <QuestionCard {node} onSelect={selectTriageOption} />
+      <QuestionCard {node} onSelect={selectTriageOption} title={atFirstScreen ? FIRST_SCREEN_TITLE : null}>
+        {#if atFirstScreen}<ZipCheck showError={zipAttempted} />{/if}
+      </QuestionCard>
     {:else if state.step === 'property-type'}
       <header class="screen-head">
         <h2>What type of property is this for?</h2>
@@ -504,7 +522,7 @@
     {/key}
   </form>
 
-  {#if talkToPerson && !state.isEmergency && state.step !== 'confirmation'}
+  {#if !state.isEmergency && state.step !== 'confirmation'}
     <!-- Above the buttons, not below: on phones the button row is sticky and
          flush with the panel's bottom edge. Emergencies already get the call bar. -->
     <p class="talk-line">
@@ -564,22 +582,14 @@
       scroll-margin-top: 6rem;
     }
 
-    /* One thing at a time: each step's question is centered and large.
+    /* The question is the card's headline, left-aligned under the steps.
        Scoped under .wizard so these beat the base rules declared later. */
-    .wizard .step-row {
-      flex-direction: column;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
     .wizard .screen-head {
-      text-align: center;
-      justify-items: center;
-      margin-bottom: 1.4rem;
+      margin-bottom: 1.2rem;
     }
 
     .wizard .screen-head h2 {
-      font-size: 2.1rem;
+      font-size: 1.9rem;
       line-height: 1.12;
       letter-spacing: -0.02em;
       text-wrap: balance;
@@ -699,30 +709,9 @@
     color: var(--color-muted);
   }
 
-  .step-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.6rem;
-  }
-
-  .progress {
-    height: 10px;
-    border-radius: 999px;
-    background: var(--color-primary-soft);
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    border-radius: inherit;
-    background: var(--color-primary-gradient);
-    transition: width 0.35s ease;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .progress-fill {
-      transition: none;
+  @media (min-width: 960px) {
+    .banner-phone {
+      display: none;
     }
   }
 
@@ -736,13 +725,6 @@
   .talk-line a {
     color: var(--color-text-strong);
     font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .time-note {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--color-muted);
     white-space: nowrap;
   }
 
@@ -781,13 +763,17 @@
     }
   }
 
+  /* Visually hidden; still announced and focusable for step changes. */
   .step-label {
-    margin: 0;
-    color: var(--color-muted);
-    font-weight: 700;
-    font-size: 0.74rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .step-body {

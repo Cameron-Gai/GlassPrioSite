@@ -7,6 +7,9 @@
 
   export let node: TriageNode;
   export let onSelect: (option: TriageOption) => void;
+  /** Overrides the node's question as the heading (the first screen asks
+   *  for the ZIP too, so its heading covers both). */
+  export let title: string | null = null;
 
   $: isEmergencyDetail = node.id === 'emergency-which';
 
@@ -39,11 +42,14 @@
 
 <section class="card">
   <header>
-    <h2>{node.question}</h2>
+    <h2>{title ?? node.question}</h2>
     {#if node.helperText}
       <p class="helper">{node.helperText}</p>
     {/if}
   </header>
+
+  <!-- Content between the heading and the options (the first screen's ZIP). -->
+  <slot />
 
   {#if node.layout === 'yesno'}
     <YesNoTiles options={node.options} onSelect={pick} selectedId={flashId} />
@@ -143,13 +149,8 @@
     }
   }
 
-  /* Desktop: the question is the page's headline. */
+  /* Desktop: the question is the card's headline, left-aligned under the steps. */
   @media (min-width: 960px) {
-    header {
-      text-align: center;
-      justify-items: center;
-    }
-
     h2 {
       font-size: 2.1rem;
       line-height: 1.12;

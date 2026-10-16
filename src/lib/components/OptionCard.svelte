@@ -18,9 +18,14 @@
   class:emergency={tone === 'emergency'}
   on:click
 >
-  {#if icon}
+  {#if icon && tone === 'emergency'}
     <span class="icon" aria-hidden="true">
       <ServiceIcon {icon} size={26} />
+    </span>
+  {:else if icon}
+    <!-- Picture tile (design picked 2026-10-16): a tinted panel per service. -->
+    <span class="art" data-icon={icon} aria-hidden="true">
+      <ServiceIcon {icon} size={34} />
     </span>
   {/if}
   <span class="body">
@@ -119,6 +124,30 @@
     color: var(--color-primary);
     flex-shrink: 0;
   }
+
+  .art {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 64px;
+    border-radius: 10px;
+    color: var(--color-primary);
+    background: linear-gradient(135deg, #e7f3fc, #b9dcf5);
+    transition: transform 0.15s ease;
+  }
+
+  .card:hover .art {
+    transform: scale(1.02);
+  }
+
+  .art[data-icon='window'] { background: linear-gradient(135deg, #ececf8, #c7c6ea); }
+  .art[data-icon='storefront'] { background: linear-gradient(135deg, #e6edf9, #a9bfe8); }
+  .art[data-icon='patio'] { background: linear-gradient(135deg, #e5f4fc, #a6d6f1); }
+  .art[data-icon='shower'] { background: linear-gradient(135deg, #eef8fd, #bfe2f7); }
+  .art[data-icon='hardware'] { background: linear-gradient(135deg, #fff0f2, #ffc9cf); color: var(--color-emergency); }
+  .art[data-icon='multi'] { background: linear-gradient(135deg, #eef0fb, #d2d6f2); }
+  .art[data-icon='measure'] { background: linear-gradient(135deg, #e9f6f0, #b8e2cc); color: #11603b; }
+  .art[data-icon='other'] { background: linear-gradient(135deg, #f1f3f7, #d8dee9); }
 
   .card.emergency .icon {
     background: var(--color-emergency-bg);

@@ -52,6 +52,8 @@ export interface FeeQuoteClient {
   paymentRequired: boolean;
 }
 
+export type AreaStatus = 'idle' | 'checking' | 'in' | 'out' | 'unknown';
+
 export interface IntakeState {
   step: WizardStep;
   triageHistory: string[];
@@ -76,6 +78,9 @@ export interface IntakeState {
   /** Early, non-authoritative quote from the address step's ZIP check —
    *  feeds the summary rail; review re-resolves authoritatively. */
   advisoryQuote: { serviced: boolean; osc: number; zoneName: string | null; flag: string } | null;
+  /** First-screen ZIP check against the zone map. 'unknown' = the zone map
+   *  couldn't answer, so the visitor goes through (never turn away a real lead). */
+  areaStatus: AreaStatus;
   /** Stripe PaymentIntent id once the card hold is authorized. */
   paymentIntentId: string | null;
   paymentAuthorized: boolean;
@@ -204,6 +209,7 @@ function initialState(): IntakeState {
     schedulingPreference: '',
     feeQuote: null,
     advisoryQuote: null,
+    areaStatus: 'idle',
     paymentIntentId: null,
     paymentAuthorized: false,
     payLater: false,
@@ -272,6 +278,7 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
     // Time-sensitive / transient — never trust these across a reload.
     feeQuote: null,
     advisoryQuote: null,
+    areaStatus: 'idle',
     paymentIntentId: null,
     paymentAuthorized: false,
     payLater: false,
@@ -665,6 +672,7 @@ function createIntakeStore() {
       address: { ...state.address, ...patch },
       feeQuote: null,
       advisoryQuote: 'zip' in patch ? null : state.advisoryQuote,
+      areaStatus: 'zip' in patch && patch.zip?.trim().slice(0, 5) !== state.address.zip.trim().slice(0, 5) ? 'idle' : state.areaStatus,
       paymentIntentId: null,
       paymentAuthorized: false,
       payLater: false,
@@ -678,6 +686,10 @@ function createIntakeStore() {
 
   function setFeeQuote(quote: FeeQuoteClient) {
     store.update((state) => ({ ...state, feeQuote: quote }));
+  }
+
+  function setAreaStatus(areaStatus: AreaStatus) {
+    store.update((state) => ({ ...state, areaStatus }));
   }
 
   /** Advisory quote from the address-step ZIP check (summary-rail display only). */
@@ -948,6 +960,7 @@ function createIntakeStore() {
     dismissReturningCustomer,
     setFeeQuote,
     setAdvisoryQuote,
+    setAreaStatus,
     setPaymentAuthorized,
     setPayLater,
     setPayLaterInfo,

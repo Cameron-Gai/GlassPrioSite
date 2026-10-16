@@ -10,15 +10,21 @@
    * opens inline under the chip. Desktop (≥960px): one row; the headline is
    * left to the question itself, and the summary drops down as a card.
    *
-   * Deliberately shows NO step count, step list, or progress meter (owner
-   * decision 2026-09-21): a visible "2 of 8" costs more abandonment than it
-   * buys orientation. Reassure with time ("about two minutes"), never length.
+   * Progress lives in the form itself (StepProgress) since 2026-10-16, when
+   * Cameron picked the combined design for both sites; it replaced the
+   * 2026-09-21 no-progress-meter rule this band was built around.
    */
   import { intakeStore } from '$lib/stores/intakeStore';
   import { describeTiming } from '$lib/utils/timing';
   import { propertyTypeLabel } from '$lib/types/intake';
 
   export let openNow: boolean;
+  /** Phones: the band's own headline before any answer. Off when the page
+   *  shows MobileHero instead (IntakeLayout). */
+  export let showPromise = true;
+  /** Computers: the "Your request" dropdown. Off when the page shows the
+   *  SummaryRail beside the form instead (IntakeLayout). */
+  export let deskSummary = true;
 
   const SUPPORT_PHONE = '(206) 508-2444';
   const SUPPORT_PHONE_HREF = 'tel:+12065082444';
@@ -81,7 +87,7 @@
     </div>
 
     <div class="bp-end">
-      {#if hasAnything}
+      {#if hasAnything && deskSummary}
         <button
           type="button"
           class="handle handle-desk"
@@ -108,7 +114,11 @@
   </div>
 
   {#if !hasAnything}
-    <h1 class="promise">Glass fixed right. Requested in two minutes.</h1>
+    {#if showPromise}
+      <h1 class="promise">Glass fixed right. Requested in two minutes.</h1>
+    {:else}
+      <h1 class="sr-only">Glass Doctor — request service</h1>
+    {/if}
   {:else}
     <h1 class="sr-only">Glass Doctor — request service</h1>
     <button
