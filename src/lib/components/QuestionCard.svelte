@@ -3,13 +3,15 @@
   import OptionButton from './OptionButton.svelte';
   import OptionCard from './OptionCard.svelte';
   import YesNoTiles from './YesNoTiles.svelte';
+  import PriorityOffer from './PriorityOffer.svelte';
   import type { TriageNode, TriageOption } from '$lib/triage/triageTree';
   import { SERVICE_INFO } from '$lib/data/serviceInfo';
 
   export let node: TriageNode;
   export let onSelect: (option: TriageOption) => void;
 
-  $: isEmergencyDetail = node.id === 'emergency-which';
+  // The "This is a priority" offer: the card, then accept / no thanks.
+  $: isPriorityOffer = node.id === 'priority-confirm';
 
   // Brief "selected" flash before advancing, so a tap visibly registers instead
   // of the screen just swapping. Skipped under prefers-reduced-motion.
@@ -46,6 +48,8 @@
     {/if}
   </header>
 
+  {#if isPriorityOffer}<PriorityOffer />{/if}
+
   {#if node.layout === 'yesno'}
     <YesNoTiles options={node.options} onSelect={pick} selectedId={flashId} />
   {:else if node.layout === 'cards'}
@@ -71,7 +75,7 @@
           label={option.label}
           helperText={option.helperText}
           icon={option.icon}
-          emphasis={isEmergencyDetail ? 'emergency' : 'default'}
+          emphasis={isPriorityOffer && option.isEmergency ? 'emergency' : 'default'}
           selected={flashId === option.id}
           on:click={() => pick(option)}
         />

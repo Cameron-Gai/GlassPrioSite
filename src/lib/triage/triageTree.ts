@@ -53,39 +53,33 @@ export interface TriageNode {
 // service grid (2026-07-14): the red emergency tile below is one tap for the
 // urgent minority, and the non-urgent majority saves a whole screen.
 export const triageTree: Record<string, TriageNode> = {
-  'emergency-which': {
-    id: 'emergency-which',
-    question: 'Which best describes the emergency?',
-    helperText: "This helps the responder come prepared. We'll still treat it as urgent.",
+  // The priority offer (Cameron, 2026-10-20): the red tile now reads "This is
+  // a priority" and leads here instead of asking which kind of emergency.
+  // The wizard shows the Priority Service card (or, after hours, Emergency
+  // Service) above these two choices. Accepting skips the job-type questions,
+  // access & photos and timing: ZIP + property, address, contact, then
+  // "tell us what's going on", then review (EMERGENCY_STEP_ORDER).
+  // CHANNEL PARITY: GlassReports/src/lib/intake/triage.ts still has the old
+  // 'emergency-which' question for the employee phone intake (intentional:
+  // agents on a call need the detail; customers on the web don't).
+  'priority-confirm': {
+    id: 'priority-confirm',
+    question: 'Priority service',
+    helperText: 'We send a professional fast. Here is what that includes.',
     layout: 'list',
     options: [
       {
-        id: 'emergency-broken-glass',
-        label: 'Broken glass creating a safety hazard',
+        id: 'priority-accept',
+        label: 'Yes, send priority service',
         icon: 'emergency-glass',
         systemAction: 'checkBusinessHours',
         isEmergency: true
       },
       {
-        id: 'emergency-unsecure',
-        label: 'A door or window cannot secure the building',
-        icon: 'emergency-door',
-        systemAction: 'checkBusinessHours',
-        isEmergency: true
-      },
-      {
-        id: 'emergency-business-entrance',
-        label: 'A business entrance is unusable',
-        icon: 'emergency-storefront',
-        systemAction: 'checkBusinessHours',
-        isEmergency: true
-      },
-      {
-        id: 'emergency-weather',
-        label: 'Water or weather is entering the property',
-        icon: 'emergency-weather',
-        systemAction: 'checkBusinessHours',
-        isEmergency: true
+        id: 'priority-decline',
+        label: 'No thanks, I’ll pick a service',
+        icon: 'other',
+        nextNodeId: 'service-category'
       }
     ]
   },
@@ -98,11 +92,11 @@ export const triageTree: Record<string, TriageNode> = {
     options: [
       {
         id: 'cat-emergency',
-        label: 'This is an emergency',
-        helperText: 'Broken glass, unsecured door or window, weather coming in — same-day dispatch',
+        label: 'This is a priority',
+        helperText: 'Broken glass, a door or window that won’t secure, weather coming in: a professional on-site fast',
         icon: 'emergency-glass',
         tone: 'emergency',
-        nextNodeId: 'emergency-which'
+        nextNodeId: 'priority-confirm'
       },
       {
         id: 'cat-glass',

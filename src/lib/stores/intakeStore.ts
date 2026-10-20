@@ -143,17 +143,20 @@ export const STEP_ORDER: WizardStep[] = [
 ];
 
 /**
- * Emergency fast-track: someone with glass on the floor shouldn't fill out a
- * 9-step form. Issue/site details become optional (photos can be added on the
- * review screen) and scheduling is skipped entirely — dispatch is immediate, so
- * there's no window to pick. Property type stays: it's one tap and it drives
- * the business-unit routing.
+ * Priority fast-track (the "This is a priority" tile, accepted on the offer
+ * screen): someone with glass on the floor shouldn't fill out a 9-step form.
+ * Cameron, 2026-10-20: no job-type questions, contact details first, then
+ * "tell us what's going on"; access & photos and scheduling are skipped
+ * (dispatch is immediate, so there's no window to pick — photos can still be
+ * added on the review screen). The ZIP + property step stays: the ZIP check
+ * stops out-of-area calls and the property type drives business-unit routing.
  */
 export const EMERGENCY_STEP_ORDER: WizardStep[] = [
   'triage',
   'property-type',
   'address',
   'contact',
+  'issue',
   'review',
   'confirmation'
 ];

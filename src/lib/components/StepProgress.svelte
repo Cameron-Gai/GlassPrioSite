@@ -6,8 +6,8 @@
    * a bold bar, and ServiceTitan's own scheduler names its steps the same way.
    *
    * The wizard has more screens than this shows: property type, issue and
-   * access all count as "Details". Emergencies skip timing, so their last
-   * step reads "Dispatch" and fills in at review.
+   * access all count as "Details". Priority requests skip timing, so their
+   * last step reads "Dispatch" and fills in at review.
    */
   import { stepsFor, type IntakeState, type WizardStep } from '$lib/stores/intakeStore';
 
@@ -26,8 +26,22 @@
     confirmation: 6
   };
 
-  $: idx = GROUP[state.step];
-  $: names = state.isEmergency ? ['Service', 'Details', 'Address', 'Contact', 'Dispatch'] : NAMES;
+  // Priority requests run in a different order (EMERGENCY_STEP_ORDER): the
+  // ZIP + property and address screens are "Location", the issue comes after
+  // contact, and the last step is dispatch rather than picking a time.
+  const PRIORITY_NAMES = ['Priority', 'Location', 'Contact', 'Details', 'Dispatch'];
+  const PRIORITY_GROUP: Partial<Record<WizardStep, number>> = {
+    triage: 0,
+    'property-type': 1,
+    address: 1,
+    contact: 2,
+    issue: 3,
+    review: 5,
+    confirmation: 6
+  };
+
+  $: idx = state.isEmergency ? (PRIORITY_GROUP[state.step] ?? GROUP[state.step]) : GROUP[state.step];
+  $: names = state.isEmergency ? PRIORITY_NAMES : NAMES;
   $: total = state.isEmergency ? 4 : 5;
   // Share of the form done: whole screens through stepsFor(), plus a nudge
   // per triage answer since triage is several questions on one step.
