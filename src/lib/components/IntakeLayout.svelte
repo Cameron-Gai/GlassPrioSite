@@ -27,6 +27,7 @@
 </script>
 
 <RunningMan />
+<RunningMan trigger="booked" brand="Request received" line="We've got you covered. We'll be there." />
 
 <div class="page">
   <div class="band">

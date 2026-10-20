@@ -6,11 +6,19 @@
    * On both / and /book since 2026-10-20 (the two pages match). Image from
    * Jim: static/running-man.png.
    *
-   * Kept out of the way on purpose: about 6 seconds, once per browser
-   * session, any tap skips it, and it never runs with reduced motion. It
-   * renders only after mount, so it never holds up the page or the form.
+   * Kept out of the way on purpose: about 6 seconds, any tap skips it, and
+   * it never runs with reduced motion. Two uses (Cameron, 2026-10-20):
+   *   trigger="load"   — on arrival, once per browser session
+   *   trigger="booked" — every time a request goes through, covering the
+   *                      screen just before the confirmation shows
+   * It renders only after mount, so it never holds up the page or the form.
    */
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { intakeStore } from '$lib/stores/intakeStore';
+
+  export let trigger: 'load' | 'booked' = 'load';
+  export let brand = 'Glass Doctor';
+  export let line = 'We fix your panes.';
 
   const SEEN_KEY = 'gd-running-man-seen';
   const RUN_MS = 6000;
@@ -23,7 +31,30 @@
     if (timer) clearTimeout(timer);
   }
 
+  function run() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (timer) clearTimeout(timer);
+    running = true;
+    timer = setTimeout(stop, RUN_MS);
+  }
+
+  // "booked": the moment the wizard reaches the confirmation step.
+  let lastStep: string | null = null;
+  const unsubscribe =
+    trigger === 'booked'
+      ? intakeStore.subscribe((s) => {
+          if (lastStep !== null && s.step === 'confirmation' && lastStep !== 'confirmation') run();
+          lastStep = s.step;
+        })
+      : () => {};
+
+  onDestroy(() => {
+    unsubscribe();
+    stop();
+  });
+
   onMount(() => {
+    if (trigger !== 'load') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     try {
       if (sessionStorage.getItem(SEEN_KEY)) return;
@@ -31,17 +62,15 @@
     } catch {
       /* storage blocked: still run once for this page view */
     }
-    running = true;
-    timer = setTimeout(stop, RUN_MS);
-    return stop;
+    run();
   });
 </script>
 
 {#if running}
-  <button type="button" class="runway" aria-label="Skip intro" on:click={stop}>
+  <button type="button" class="runway" aria-label={trigger === 'booked' ? 'Show my confirmation' : 'Skip intro'} on:click={stop}>
     <span class="message">
-      <span class="message-brand">Glass Doctor</span>
-      <span class="message-line">We fix your panes.</span>
+      <span class="message-brand">{brand}</span>
+      <span class="message-line">{line}</span>
     </span>
     <span class="streak streak-red"></span>
     <span class="streak streak-blue"></span>
@@ -98,6 +127,8 @@
   }
 
   .message-line {
+    max-width: 20ch;
+    text-wrap: balance;
     font-size: clamp(2rem, 7vw, 3.6rem);
     font-weight: 900;
     line-height: 1.05;
