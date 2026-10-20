@@ -81,7 +81,7 @@ body {
   background-attachment: fixed;
   color: var(--color-text);
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.55;
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
@@ -150,6 +150,16 @@ h3 {
 @media (max-width: 640px) {
   body {
     font-size: 15.5px;
+  }
+}
+
+/* Big monitors: scale the whole page with the screen (everything sized in
+   rem grows with it). 16px up to ~1920px wide, ~20px at 2560px (2K/1440p),
+   capped at 24px for 4K, so the form doesn't shrink to a small island in
+   the middle of a wide screen. */
+@media (min-width: 1680px) {
+  html {
+    font-size: clamp(16px, calc(0.625vw + 4px), 24px);
   }
 }
 

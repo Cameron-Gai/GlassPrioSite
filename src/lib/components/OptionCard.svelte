@@ -104,8 +104,8 @@
     top: 0.45rem;
     right: 0.45rem;
     z-index: 2;
-    width: 30px;
-    height: 30px;
+    width: 1.875rem;
+    height: 1.875rem;
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -341,8 +341,8 @@
   .art[data-icon='other'] { background: linear-gradient(135deg, #f1f3f7, #d8dee9); }
 
   .card.emergency .icon {
-    width: 54px;
-    height: 54px;
+    width: 3.375rem;
+    height: 3.375rem;
     border-radius: 50%;
     background: #fff;
     color: var(--color-emergency);

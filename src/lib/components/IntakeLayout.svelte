@@ -176,7 +176,7 @@
     }
 
     main {
-      max-width: 1240px;
+      max-width: 77.5rem;
       padding: 2.2rem 1.5rem 3rem;
     }
 
@@ -219,7 +219,7 @@
     }
 
     .layout {
-      grid-template-columns: minmax(0, 1fr) 320px;
+      grid-template-columns: minmax(0, 1fr) 20rem;
       gap: 1.75rem;
       align-items: start;
     }
@@ -243,11 +243,11 @@
 
   @media (min-width: 1440px) {
     main {
-      max-width: 1360px;
+      max-width: 85rem;
     }
 
     .layout {
-      grid-template-columns: minmax(0, 1fr) 360px;
+      grid-template-columns: minmax(0, 1fr) 22.5rem;
     }
   }
 </style>
