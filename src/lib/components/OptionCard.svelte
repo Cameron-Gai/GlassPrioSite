@@ -7,7 +7,8 @@
   export let icon: IconKey | undefined = undefined;
   /** Brief post-tap highlight while the wizard advances. */
   export let selected = false;
-  /** 'emergency' renders red-tinted and horizontal (used full-row in the grid). */
+  /** 'emergency' is the "This is a priority" tile: solid brand blue, larger,
+   *  horizontal, full-row in the grid (restyled 2026-10-20). */
   export let tone: 'default' | 'emergency' = 'default';
   /** "Did you know?" text behind the eye icon (Jim, 2026-10-16). It sits in a
    *  separate button beside the card, never inside it: tapping it must not
@@ -27,7 +28,7 @@
 >
   {#if icon && tone === 'emergency'}
     <span class="icon" aria-hidden="true">
-      <ServiceIcon {icon} size={26} />
+      <ServiceIcon {icon} size={30} />
     </span>
   {:else if icon}
     <!-- Picture tile (design picked 2026-10-16): a tinted panel per service. -->
@@ -178,29 +179,50 @@
     box-shadow: var(--ring-focus);
   }
 
-  /* Emergency tile: red, horizontal, spans the full grid row (set by parent). */
+  /* Priority tile ("This is a priority"): solid brand blue, larger, horizontal,
+     spans the full grid row (set by parent). Blue rather than red so it reads
+     as the fast option, not a warning; the red stays in the icon. */
   .card.emergency {
+    position: relative;
     flex-direction: row;
     align-items: center;
+    gap: 1rem;
     min-height: 0;
-    border-color: var(--color-emergency-soft);
-    background: linear-gradient(180deg, #fff6f4 0%, #ffffff 75%);
+    padding: 1.15rem 3rem 1.15rem 1.15rem;
+    border: 0;
+    background: var(--color-primary-gradient);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(6, 3, 141, 0.22);
+  }
+
+  .card.emergency::after {
+    content: '→';
+    position: absolute;
+    right: 1.1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.4rem;
+    font-weight: 700;
+    transition: transform 0.15s ease;
   }
 
   .card.emergency .body {
     display: grid;
-    gap: 0.15rem;
+    gap: 0.3rem;
   }
 
   .card.emergency:hover {
-    border-color: var(--color-emergency);
-    background: linear-gradient(180deg, #ffe8e3 0%, #ffffff 75%);
+    background: linear-gradient(135deg, #04026a 0%, #1a3fb8 100%);
+    box-shadow: 0 14px 30px rgba(6, 3, 141, 0.3);
+  }
+
+  .card.emergency:hover::after {
+    transform: translate(4px, -50%);
   }
 
   .card.emergency.selected {
-    border-color: var(--color-emergency);
-    background: var(--color-emergency-bg);
-    box-shadow: 0 0 0 4px rgba(228, 0, 43, 0.16);
+    background: linear-gradient(135deg, #04026a 0%, #1a3fb8 100%);
+    box-shadow: 0 0 0 4px rgba(6, 3, 141, 0.25);
   }
 
   .icon {
@@ -240,7 +262,10 @@
   .art[data-icon='other'] { background: linear-gradient(135deg, #f1f3f7, #d8dee9); }
 
   .card.emergency .icon {
-    background: var(--color-emergency-bg);
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: #fff;
     color: var(--color-emergency);
   }
 
@@ -250,8 +275,9 @@
   }
 
   .card.emergency .label {
-    font-weight: 700;
-    color: var(--color-emergency);
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #fff;
   }
 
   .helper {
@@ -262,5 +288,8 @@
 
   .card.emergency .helper {
     margin-top: 0;
+    font-size: 0.92rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.88);
   }
 </style>

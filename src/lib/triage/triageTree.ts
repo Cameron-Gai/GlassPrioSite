@@ -93,7 +93,7 @@ export const triageTree: Record<string, TriageNode> = {
       {
         id: 'cat-emergency',
         label: 'This is a priority',
-        helperText: 'Broken glass, a door or window that won’t secure, weather coming in: a professional on-site fast',
+        helperText: 'Same-day priority service, or after-hours emergency help. For broken glass, a door that won’t lock, or weather coming in.',
         icon: 'emergency-glass',
         tone: 'emergency',
         nextNodeId: 'priority-confirm'

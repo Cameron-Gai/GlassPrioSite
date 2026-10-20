@@ -4,9 +4,8 @@
    * over (design picked 2026-10-16). Once the customer answers anything it
    * gives way to the slim brand band, so later steps start at the question.
    *
-   * Behind the headline: a slideshow of Glass Doctor brand photos, opening
-   * with a before/after pair (Jim, 2026-10-16). They're Neighborly brand
-   * assets, not Seattle jobs, so nothing labels them as our work. In front:
+   * Behind the headline: the brand-photo slideshow (PhotoSlideshow, shared
+   * with the desktop summary rail). In front:
    * curated real Google reviews that link to Google (src/lib/data/
    * heroReviews.ts), shown only once that list has entries; until then the
    * three trust points take their place. Never placeholder reviews.
@@ -14,56 +13,30 @@
   import { onDestroy, onMount } from 'svelte';
   import { intakeStore } from '$lib/stores/intakeStore';
   import { HERO_REVIEWS } from '$lib/data/heroReviews';
+  import PhotoSlideshow from './PhotoSlideshow.svelte';
 
-  const SLIDES = [
-    { src: '/hero/before-broken-pane.jpg', tag: 'Before' },
-    { src: '/hero/after-fixed-pane.jpg', tag: 'After' },
-    { src: '/hero/tech-window.jpg', tag: '' },
-    { src: '/hero/custom-glass.jpg', tag: '' },
-    { src: '/hero/patio.jpg', tag: '' },
-    { src: '/hero/glass-table.jpg', tag: '' }
-  ];
-  const SLIDE_MS = 5000;
   const REVIEW_MS = 7000;
 
-  let slide = 0;
   let review = 0;
-  // Only the first photo loads with the page; the rest follow once it's up,
-  // so the first screen isn't waiting on half a megabyte of images.
-  let loadedCount = 1;
-  let timers: ReturnType<typeof setInterval>[] = [];
+  let reviewTimer: ReturnType<typeof setInterval> | null = null;
 
   $: show = $intakeStore.step === 'triage' && $intakeStore.triageHistory.length === 0;
 
   onMount(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const start = setTimeout(() => {
-      loadedCount = SLIDES.length;
-      timers.push(setInterval(() => (slide = (slide + 1) % SLIDES.length), SLIDE_MS));
-    }, 1500);
-    timers.push(start as unknown as ReturnType<typeof setInterval>);
     if (HERO_REVIEWS.length > 1) {
-      timers.push(setInterval(() => (review = (review + 1) % HERO_REVIEWS.length), REVIEW_MS));
+      reviewTimer = setInterval(() => (review = (review + 1) % HERO_REVIEWS.length), REVIEW_MS);
     }
   });
 
-  onDestroy(() => timers.forEach((t) => clearInterval(t)));
+  onDestroy(() => {
+    if (reviewTimer) clearInterval(reviewTimer);
+  });
 </script>
 
 {#if show}
   <section class="hero" aria-label="Glass Doctor">
-    <div class="slides" aria-hidden="true">
-      {#each SLIDES.slice(0, loadedCount) as s, i (s.src)}
-        <img
-          src={s.src}
-          alt=""
-          class:on={i === slide}
-          decoding="async"
-          fetchpriority={i === 0 ? 'high' : 'low'}
-        />
-      {/each}
-      {#if SLIDES[slide].tag}<span class="tag">{SLIDES[slide].tag}</span>{/if}
-    </div>
+    <PhotoSlideshow />
     <div class="shade" aria-hidden="true"></div>
 
     <div class="content">
@@ -100,45 +73,10 @@
     background: var(--color-primary);
   }
 
-  .slides,
-  .shade {
-    position: absolute;
-    inset: 0;
-  }
-
-  .slides img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    opacity: 0;
-    transform: scale(1.04);
-    transition: opacity 1.2s ease, transform 6s ease-out;
-  }
-
-  .slides img.on {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  .tag {
-    position: absolute;
-    top: 0.8rem;
-    right: 0.8rem;
-    z-index: 1;
-    font-size: 0.68rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 0.2rem 0.55rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    color: var(--color-text-strong);
-  }
-
   /* Brand-blue wash so white type stays readable over any photo. */
   .shade {
+    position: absolute;
+    inset: 0;
     background: linear-gradient(
       180deg,
       rgba(6, 3, 141, 0.82) 0%,
@@ -242,11 +180,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .slides img {
-      transition: none;
-      transform: none;
-    }
-
     .review {
       animation: none;
     }
