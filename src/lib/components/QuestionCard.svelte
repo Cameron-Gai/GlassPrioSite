@@ -137,9 +137,11 @@
     }
   }
 
+  /* Small phones keep two across: with photo tiles, one column makes a very
+     long scroll. Tighter gap instead. */
   @media (max-width: 420px) {
     .grid {
-      grid-template-columns: 1fr;
+      gap: 0.55rem;
     }
   }
 

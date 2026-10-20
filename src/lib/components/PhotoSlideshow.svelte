@@ -14,8 +14,10 @@
 
   /** Small "Before" / "After" tag in the corner. */
   export let showTag = true;
-  /** Use the 1920px exports (static/hero/*-1920.jpg) for full-width use. */
+  /** Use the 1920px exports (static/hero/*-1920.jpg) on wide screens;
+   *  phones and tablets keep the 1100px versions. */
   export let large = false;
+  let useLarge = false;
 
   const SLIDES = [
     { src: '/hero/before-broken-pane.jpg', tag: 'Before' },
@@ -33,6 +35,7 @@
   let cycle: ReturnType<typeof setInterval> | null = null;
 
   onMount(() => {
+    useLarge = large && window.matchMedia('(min-width: 960px)').matches;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     startTimer = setTimeout(() => {
       loadedCount = SLIDES.length;
@@ -48,7 +51,7 @@
 
 <div class="slides" aria-hidden="true">
   {#each SLIDES.slice(0, loadedCount) as s, i (s.src)}
-    <img src={large ? s.src.replace('.jpg', '-1920.jpg') : s.src} alt="" class:on={i === slide} decoding="async" fetchpriority={i === 0 ? 'high' : 'low'} />
+    <img src={useLarge ? s.src.replace('.jpg', '-1920.jpg') : s.src} alt="" class:on={i === slide} decoding="async" fetchpriority={i === 0 ? 'high' : 'low'} />
   {/each}
   {#if showTag && SLIDES[slide].tag}<span class="tag">{SLIDES[slide].tag}</span>{/if}
 </div>

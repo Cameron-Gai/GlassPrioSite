@@ -35,7 +35,8 @@
 
   <MobileHero />
 
-  <!-- Computers only: photos behind the whole page. -->
+  <!-- Photos behind the whole page, every screen size (2026-10-20: blue all
+       the way around the form card on phones too). -->
   <div class="desk-backdrop" aria-hidden="true">
     <PhotoSlideshow large showTag={false} />
     <div class="desk-shade"></div>
@@ -125,7 +126,7 @@
 
   .foot {
     margin-top: 1.5rem;
-    color: var(--color-muted);
+    color: rgba(255, 255, 255, 0.85);
     font-size: 0.85rem;
     text-align: center;
     display: grid;
@@ -137,11 +138,31 @@
   }
 
   .emergency-line {
-    color: var(--color-emergency);
+    color: #ffc9d1;
     font-weight: 600;
   }
 
-  .desk-backdrop,
+  .desk-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: var(--color-primary);
+  }
+
+  /* Strong enough that white type and the cards read over any photo;
+     lighter to the right so the photos still show. */
+  .desk-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      rgba(6, 3, 141, 0.9) 0%,
+      rgba(6, 3, 141, 0.72) 45%,
+      rgba(6, 3, 141, 0.5) 100%
+    );
+  }
+
   .desk-copy {
     display: none;
   }
@@ -157,27 +178,6 @@
   }
 
   @media (min-width: 960px) {
-    .desk-backdrop {
-      display: block;
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background: var(--color-primary);
-    }
-
-    /* Strong enough that white type and the cards read over any photo;
-       lighter to the right so the photos still show. */
-    .desk-shade {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        100deg,
-        rgba(6, 3, 141, 0.9) 0%,
-        rgba(6, 3, 141, 0.72) 45%,
-        rgba(6, 3, 141, 0.5) 100%
-      );
-    }
-
     main {
       max-width: 77.5rem;
       padding: 2.2rem 1.5rem 3rem;
@@ -236,11 +236,6 @@
 
     .foot {
       margin-top: 2.5rem;
-      color: rgba(255, 255, 255, 0.85);
-    }
-
-    .emergency-line {
-      color: #ffc9d1;
     }
   }
 

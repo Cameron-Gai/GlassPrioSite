@@ -4,8 +4,8 @@
    * over (design picked 2026-10-16). Once the customer answers anything it
    * gives way to the slim brand band, so later steps start at the question.
    *
-   * Behind the headline: the brand-photo slideshow (PhotoSlideshow, shared
-   * with the desktop summary rail). In front:
+   * It sits on the page-wide photo backdrop (IntakeLayout), so it has no
+   * photos of its own any more. Below the headline:
    * curated real Google reviews that link to Google (src/lib/data/
    * heroReviews.ts), shown only once that list has entries; until then the
    * three trust points take their place. Never placeholder reviews.
@@ -13,7 +13,6 @@
   import { onDestroy, onMount } from 'svelte';
   import { intakeStore } from '$lib/stores/intakeStore';
   import { HERO_REVIEWS } from '$lib/data/heroReviews';
-  import PhotoSlideshow from './PhotoSlideshow.svelte';
 
   const REVIEW_MS = 7000;
 
@@ -36,8 +35,6 @@
 
 {#if show}
   <section class="hero" aria-label="Glass Doctor">
-    <PhotoSlideshow />
-    <div class="shade" aria-hidden="true"></div>
 
     <div class="content">
       <p class="headline">Glass fixed right. Booked in two minutes.</p>
@@ -66,24 +63,10 @@
 <style>
   .hero {
     position: relative;
+    z-index: 1; /* above the page backdrop, which comes later in the page */
     overflow: hidden;
     color: #fff;
-    min-height: 19rem;
     display: grid;
-    background: var(--color-primary);
-  }
-
-  /* Brand-blue wash so white type stays readable over any photo. */
-  .shade {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      180deg,
-      rgba(6, 3, 141, 0.82) 0%,
-      rgba(6, 3, 141, 0.5) 34%,
-      rgba(6, 3, 141, 0.22) 62%,
-      rgba(6, 3, 141, 0.7) 100%
-    );
   }
 
   .content {

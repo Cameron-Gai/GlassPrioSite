@@ -6,14 +6,14 @@
    * On both / and /book since 2026-10-20 (the two pages match). Image from
    * Jim: static/running-man.png.
    *
-   * Kept out of the way on purpose: about 4 seconds, once per browser
+   * Kept out of the way on purpose: about 6 seconds, once per browser
    * session, any tap skips it, and it never runs with reduced motion. It
    * renders only after mount, so it never holds up the page or the form.
    */
   import { onMount } from 'svelte';
 
   const SEEN_KEY = 'gd-running-man-seen';
-  const RUN_MS = 4200;
+  const RUN_MS = 6000;
 
   let running = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -39,6 +39,10 @@
 
 {#if running}
   <button type="button" class="runway" aria-label="Skip intro" on:click={stop}>
+    <span class="message">
+      <span class="message-brand">Glass Doctor</span>
+      <span class="message-line">We fix your panes.</span>
+    </span>
     <span class="streak streak-red"></span>
     <span class="streak streak-blue"></span>
     <!-- One drawn pose, so the run is faked: the wrapper crosses the screen
@@ -67,7 +71,50 @@
     cursor: pointer;
     overflow: hidden;
     background: linear-gradient(135deg, var(--color-primary) 0%, #1a3fb8 100%);
-    animation: runway-out 4.2s ease forwards;
+    animation: runway-out 6s ease forwards;
+  }
+
+  /* The reassuring line above him (Cameron, 2026-10-20). */
+  .message {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 18%;
+    display: grid;
+    gap: 0.35rem;
+    justify-items: center;
+    text-align: center;
+    color: #fff;
+    padding: 0 1rem;
+    animation: message-in 6s ease forwards;
+  }
+
+  .message-brand {
+    font-size: clamp(0.85rem, 2.4vw, 1.1rem);
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+
+  .message-line {
+    font-size: clamp(2rem, 7vw, 3.6rem);
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  }
+
+  @keyframes message-in {
+    0% {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    12%,
+    100% {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   .runner {
@@ -75,7 +122,7 @@
     top: 50%;
     left: 0;
     width: min(46vw, 220px);
-    animation: run 4.2s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
+    animation: run 6s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
   }
 
   .man {
@@ -83,7 +130,7 @@
     width: 100%;
     height: auto;
     transform-origin: 50% 95%;
-    animation: stride 0.46s linear infinite;
+    animation: stride 0.52s linear infinite;
   }
 
   /* Speed lines behind him, flickering like an old cartoon. */
@@ -122,12 +169,12 @@
     height: 22px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.7);
-    animation: puff 0.46s ease-out infinite;
+    animation: puff 0.52s ease-out infinite;
   }
 
   .puff-2 {
     left: 34%;
-    animation-delay: 0.23s;
+    animation-delay: 0.26s;
   }
 
   @keyframes stride {
@@ -177,7 +224,7 @@
     height: 14px;
     width: 120vw;
     transform-origin: left center;
-    animation: streak 4.2s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
+    animation: streak 6s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
   }
 
   .streak-red {
@@ -211,7 +258,7 @@
 
   @keyframes runway-out {
     0%,
-    78% {
+    85% {
       opacity: 1;
     }
     100% {

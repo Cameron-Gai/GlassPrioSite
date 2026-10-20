@@ -17,10 +17,11 @@
 
   let showInfo = false;
 
-  // Photo per service tile on computers (2026-10-20): Glass Doctor brand
-  // photos and franchise job photos from the Neighborly asset pack, cropped
-  // 4:3 into static/tiles/, with the icon as a small badge. Phones keep the
-  // tinted icon panel (Cameron undid photos there the same day).
+  // Photo per service tile (2026-10-20): Glass Doctor brand photos and
+  // franchise job photos from the Neighborly asset pack, cropped 4:3 into
+  // static/tiles/, with the icon as a small badge. On every screen size;
+  // small phones show the tiles two across (QuestionCard) to keep the list
+  // short.
   const TILE_PHOTOS: Partial<Record<IconKey, string>> = {
     glass: '/tiles/glass.jpg',
     window: '/tiles/window.jpg',
@@ -51,9 +52,6 @@
     <span class="photo" aria-hidden="true">
       <img src={photo} alt="" loading="lazy" decoding="async" width="640" height="480" />
       <span class="badge"><ServiceIcon {icon} size={18} /></span>
-    </span>
-    <span class="art art-phone" data-icon={icon} aria-hidden="true">
-      <ServiceIcon {icon} size={34} />
     </span>
   {:else if icon}
     <!-- Tinted panel for any service without a photo yet. -->
@@ -262,10 +260,9 @@
     flex-shrink: 0;
   }
 
-  /* Photos on computers only; phones show the tinted icon panel instead. */
   .photo {
     position: relative;
-    display: none;
+    display: block;
     width: 100%;
     aspect-ratio: 16 / 10;
     max-width: 100%;
@@ -305,16 +302,6 @@
     }
   }
 
-  @media (min-width: 960px) {
-    .photo {
-      display: block;
-    }
-
-    /* .art.art-phone so it outranks the base .art rule declared below. */
-    .art.art-phone {
-      display: none;
-    }
-  }
 
   .art {
     display: grid;
@@ -370,5 +357,34 @@
     font-size: 0.92rem;
     line-height: 1.35;
     color: rgba(255, 255, 255, 0.88);
+  }
+
+  /* Small phones: tiles two across (QuestionCard), so tighter padding/type. */
+  @media (max-width: 420px) {
+    .card:not(.emergency) {
+      padding: 0.6rem;
+      min-height: 0;
+      gap: 0.4rem;
+    }
+
+    .card:not(.emergency) .label {
+      font-size: 0.88rem;
+    }
+
+    .card:not(.emergency) .helper {
+      font-size: 0.75rem;
+    }
+
+    .info-btn {
+      width: 1.625rem;
+      height: 1.625rem;
+      top: 0.35rem;
+      right: 0.35rem;
+    }
+
+    .badge {
+      width: 24px;
+      height: 24px;
+    }
   }
 </style>
