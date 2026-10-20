@@ -9,7 +9,6 @@
   } from '$lib/stores/intakeStore';
   import { testPresets } from '$lib/data/testPresets';
   import QuestionCard from './QuestionCard.svelte';
-  import ZipCheck from './ZipCheck.svelte';
   import StepProgress from './StepProgress.svelte';
   import JobTypeBanner from './JobTypeBanner.svelte';
   import PropertyTypeForm from './PropertyTypeForm.svelte';
@@ -50,10 +49,9 @@
   function isStepValid(state: IntakeState): boolean {
     switch (state.step) {
       case 'property-type':
-        // The ZIP is asked here, right after the service choice (Jim,
-        // 2026-10-16: not on the first screen). 'unknown' = the zone map
-        // couldn't answer, so the customer goes through rather than lose the lead.
-        return !!state.propertyType && (state.areaStatus === 'in' || state.areaStatus === 'unknown');
+        // The ZIP is collected with the address (Cameron, 2026-10-20), where
+        // ZoneFeeNotice checks the area; it no longer has its own question.
+        return !!state.propertyType;
       case 'issue':
         // The description, where, and when are REQUIRED (owner request
         // 2026-08-25 — these used to hide behind an optional "Add more detail"
@@ -409,14 +407,11 @@
       <QuestionCard {node} onSelect={selectTriageOption} />
     {:else if state.step === 'property-type'}
       <header class="screen-head">
-        <h2>Where's the job, and what kind of property?</h2>
-        <p>We'll check we serve your area. The property type helps us send the right team.</p>
+        <h2>What type of property is this for?</h2>
+        <p>This helps us send the right team and pricing.</p>
       </header>
-      <div class="zip-slot">
-        <ZipCheck showError={attempted} />
-      </div>
       <PropertyTypeForm value={state.propertyType} />
-      {#if attempted && !state.propertyType}
+      {#if attempted && !isStepValid(state)}
         <p class="form-error">Please pick a property type to continue.</p>
       {/if}
     {:else if state.step === 'issue'}
@@ -514,9 +509,16 @@
   {#if !state.isEmergency && state.step !== 'confirmation'}
     <!-- Above the buttons, not below: on phones the button row is sticky and
          flush with the panel's bottom edge. Emergencies already get the call bar. -->
-    <p class="talk-line">
-      Rather talk to a person? <a href={SUPPORT_PHONE_HREF}>Call {SUPPORT_PHONE}</a>
-    </p>
+    <div class="talk-line">
+      <span class="talk-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+      </span>
+      <span class="talk-text">
+        <strong>Rather talk to a person?</strong>
+        <span>We can book it with you over the phone.</span>
+      </span>
+      <a class="talk-call" href={SUPPORT_PHONE_HREF}>Call {SUPPORT_PHONE}</a>
+    </div>
   {/if}
 
   {#if state.step !== 'confirmation'}
@@ -698,27 +700,85 @@
     color: var(--color-muted);
   }
 
-  .zip-slot {
-    margin-bottom: 1.1rem;
-  }
-
   @media (min-width: 960px) {
     .banner-phone {
       display: none;
     }
   }
 
+  /* "Rather talk to a person?" — a call bar, not a footnote (Cameron,
+     2026-10-20: make it more noticeable). */
   .talk-line {
-    margin: 0;
-    text-align: center;
-    font-size: 0.9rem;
-    color: var(--color-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: var(--radius-md);
+    background: var(--color-light-blue-soft);
+    border: 1px solid rgba(96, 175, 230, 0.55);
   }
 
-  .talk-line a {
+  .talk-icon {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+  }
+
+  .talk-text {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 0.1rem;
+    line-height: 1.3;
+  }
+
+  .talk-text strong {
     color: var(--color-text-strong);
-    font-weight: 700;
+    font-size: 0.98rem;
+  }
+
+  .talk-text span {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+  }
+
+  .talk-call {
+    flex-shrink: 0;
+    padding: 0.65rem 1rem;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.92rem;
+    text-decoration: none;
     white-space: nowrap;
+    transition: background 0.15s ease;
+  }
+
+  .talk-call:hover {
+    background: var(--color-primary-hover);
+  }
+
+  .talk-call:focus-visible {
+    outline: none;
+    box-shadow: var(--ring-focus);
+  }
+
+  /* Phones: the call button drops under the text, full width. */
+  @media (max-width: 520px) {
+    .talk-line {
+      flex-wrap: wrap;
+    }
+
+    .talk-call {
+      flex-basis: 100%;
+      text-align: center;
+    }
   }
 
   /* Directional step entrances: forward slides in from the right, back from

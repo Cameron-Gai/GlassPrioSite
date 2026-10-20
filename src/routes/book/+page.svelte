@@ -10,14 +10,14 @@
    *     by `lid` or the Google click id on the URL. When the lead has a first
    *     name, phone and email, the contact step is skipped entirely
    *     (contactFromLead); otherwise it shows with what arrived filled in
-   *   - reports the ZIP check, each step and the booking to window.dataLayer,
+   *   - reports the address step's ZIP check, each step and the booking to window.dataLayer,
    *     so the advertiser can see where visitors drop off
    * UTM tags / click ids ride onto the ServiceTitan booking as on the main site.
    */
   import { onDestroy, onMount } from 'svelte';
   import IntakeWizard from '$lib/components/IntakeWizard.svelte';
   import IntakeLayout from '$lib/components/IntakeLayout.svelte';
-  import { intakeStore, type AreaStatus } from '$lib/stores/intakeStore';
+  import { intakeStore } from '$lib/stores/intakeStore';
   import { attribution, readAttribution } from '$lib/attribution';
   import { describeBusinessHours, isBusinessHours } from '$lib/utils/businessHours';
   import type { CustomerInfo } from '$lib/types/intake';
@@ -89,15 +89,16 @@
   // --- ZIP check, step and booking events ---------------------------------
   let mounted = false;
   let lastStep: string | null = null;
-  let lastArea: AreaStatus = 'idle';
+  let lastAreaKey = '';
   let bookedSent: string | null = null;
   const unsubscribe = intakeStore.subscribe((s) => {
     if (!mounted) return;
-    if (s.areaStatus !== lastArea) {
-      lastArea = s.areaStatus;
-      if (s.areaStatus === 'in' || s.areaStatus === 'out') {
-        track('glassdoctor_zip_checked', { serviced: s.areaStatus === 'in' });
-      }
+    // The address step's ZIP lookup (ZoneFeeNotice) resolved: in area or not.
+    const q = s.advisoryQuote;
+    const areaKey = q ? `${s.address.zip.trim().slice(0, 5)}|${q.serviced}` : '';
+    if (q && areaKey !== lastAreaKey && (q.serviced || q.flag === 'unserviced-or-unknown')) {
+      lastAreaKey = areaKey;
+      track('glassdoctor_zip_checked', { serviced: q.serviced });
     }
     if (s.step !== lastStep) {
       lastStep = s.step;
