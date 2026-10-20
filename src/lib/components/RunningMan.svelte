@@ -5,14 +5,14 @@
    * retiring him "was one of the worst mistakes they ever made"). Image from
    * Jim: static/running-man.png.
    *
-   * Kept out of the way on purpose: about 2.8 seconds, once per browser
+   * Kept out of the way on purpose: about 4 seconds, once per browser
    * session, any tap skips it, and it never runs with reduced motion. It
    * renders only after mount, so it never holds up the page or the form.
    */
   import { onMount } from 'svelte';
 
   const SEEN_KEY = 'gd-running-man-seen';
-  const RUN_MS = 2800;
+  const RUN_MS = 4200;
 
   let running = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -66,7 +66,7 @@
     cursor: pointer;
     overflow: hidden;
     background: linear-gradient(135deg, var(--color-primary) 0%, #1a3fb8 100%);
-    animation: runway-out 2.8s ease forwards;
+    animation: runway-out 4.2s ease forwards;
   }
 
   .runner {
@@ -74,7 +74,7 @@
     top: 50%;
     left: 0;
     width: min(46vw, 220px);
-    animation: run 2.8s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
+    animation: run 4.2s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
   }
 
   .man {
@@ -82,7 +82,7 @@
     width: 100%;
     height: auto;
     transform-origin: 50% 95%;
-    animation: stride 0.36s linear infinite;
+    animation: stride 0.46s linear infinite;
   }
 
   /* Speed lines behind him, flickering like an old cartoon. */
@@ -121,12 +121,12 @@
     height: 22px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.7);
-    animation: puff 0.36s ease-out infinite;
+    animation: puff 0.46s ease-out infinite;
   }
 
   .puff-2 {
     left: 34%;
-    animation-delay: 0.18s;
+    animation-delay: 0.23s;
   }
 
   @keyframes stride {
@@ -176,7 +176,7 @@
     height: 14px;
     width: 120vw;
     transform-origin: left center;
-    animation: streak 2.8s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
+    animation: streak 4.2s cubic-bezier(0.45, 0.05, 0.4, 1) forwards;
   }
 
   .streak-red {
