@@ -4,12 +4,10 @@
   import OptionCard from './OptionCard.svelte';
   import YesNoTiles from './YesNoTiles.svelte';
   import type { TriageNode, TriageOption } from '$lib/triage/triageTree';
+  import { SERVICE_INFO } from '$lib/data/serviceInfo';
 
   export let node: TriageNode;
   export let onSelect: (option: TriageOption) => void;
-  /** Overrides the node's question as the heading (the first screen asks
-   *  for the ZIP too, so its heading covers both). */
-  export let title: string | null = null;
 
   $: isEmergencyDetail = node.id === 'emergency-which';
 
@@ -42,14 +40,11 @@
 
 <section class="card">
   <header>
-    <h2>{title ?? node.question}</h2>
+    <h2>{node.question}</h2>
     {#if node.helperText}
       <p class="helper">{node.helperText}</p>
     {/if}
   </header>
-
-  <!-- Content between the heading and the options (the first screen's ZIP). -->
-  <slot />
 
   {#if node.layout === 'yesno'}
     <YesNoTiles options={node.options} onSelect={pick} selectedId={flashId} />
@@ -62,6 +57,7 @@
             helperText={option.helperText}
             icon={option.icon}
             tone={option.tone ?? 'default'}
+            info={SERVICE_INFO[option.id]}
             selected={flashId === option.id}
             on:click={() => pick(option)}
           />

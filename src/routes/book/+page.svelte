@@ -9,6 +9,7 @@
    *   - runs Mike's tracking code on load (AD_TRACKING_SNIPPET, see +page.server)
    *   - prefills the contact step (and the ZIP) from the pushed lead, matched
    *     by `lid` or the Google click id on the URL, so nobody types twice
+   *   - greets the visitor with the running man (once per session)
    *   - reports the ZIP check, each step and the booking to window.dataLayer,
    *     so the advertiser can see where visitors drop off
    * UTM tags / click ids ride onto the ServiceTitan booking as on the main site.
@@ -16,6 +17,7 @@
   import { onDestroy, onMount } from 'svelte';
   import IntakeWizard from '$lib/components/IntakeWizard.svelte';
   import IntakeLayout from '$lib/components/IntakeLayout.svelte';
+  import RunningMan from '$lib/components/RunningMan.svelte';
   import { intakeStore, type AreaStatus } from '$lib/stores/intakeStore';
   import { attribution, readAttribution } from '$lib/attribution';
   import { describeBusinessHours, isBusinessHours } from '$lib/utils/businessHours';
@@ -123,6 +125,8 @@
   <meta name="robots" content="noindex" />
   {#if data.trackingSnippet}{@html data.trackingSnippet}{/if}
 </svelte:head>
+
+<RunningMan />
 
 <IntakeLayout {openNow} {hoursDescription}>
   <IntakeWizard />

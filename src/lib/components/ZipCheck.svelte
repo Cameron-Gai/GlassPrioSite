@@ -1,10 +1,10 @@
 <script lang="ts">
   /**
-   * The ZIP question on the first screen, beside the service tiles — the
-   * zone map answers "do we serve you?" before anyone fills out the form
-   * (Mike Mancini's ask 2026-10-09; on both sites since 2026-10-16). The
-   * answer lives in the store (areaStatus) so the wizard can hold the
-   * service tiles until the ZIP checks out. The address step later starts
+   * The ZIP question, asked right after the service choice (on the property
+   * step) — the zone map answers "do we serve you?" before the customer fills
+   * out the rest. It was on the first screen until Jim moved it down
+   * (2026-10-16). The answer lives in the store (areaStatus) so the wizard
+   * can hold the step until the ZIP checks out. The address step later starts
    * with this ZIP filled in.
    *
    * Fails open: when the zone map can't answer, areaStatus is 'unknown' and
@@ -14,7 +14,7 @@
    */
   import { intakeStore } from '$lib/stores/intakeStore';
 
-  /** Show the "enter a ZIP" error (set after a tile is tapped too early). */
+  /** Show the "enter a ZIP" error (after Continue is pressed without one). */
   export let showError = false;
 
   const SUPPORT_PHONE = '(206) 508-2444';
@@ -69,7 +69,7 @@
     {#if status === 'checking'}
       <p class="zc-note zc-muted">Checking your area…</p>
     {:else if status === 'in'}
-      <p class="zc-note zc-ok">✓ We serve {zip}. Pick a service below to continue.</p>
+      <p class="zc-note zc-ok">✓ We serve {zip}.</p>
     {:else if status === 'out'}
       <p class="zc-note zc-out">
         <strong>We don't serve {zip} yet.</strong> Think that's wrong? Call

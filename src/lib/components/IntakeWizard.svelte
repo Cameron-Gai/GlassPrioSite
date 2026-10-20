@@ -28,9 +28,6 @@
   export let embedded = false;
   export let onStepChanged: (() => void) | null = null;
 
-  /** The first screen asks for the ZIP beside the service tiles. */
-  const FIRST_SCREEN_TITLE = "Where's the job, and what needs fixing?";
-
   const SUPPORT_PHONE = '(206) 508-2444';
   const SUPPORT_PHONE_HREF = 'tel:+12065082444';
 
@@ -53,7 +50,10 @@
   function isStepValid(state: IntakeState): boolean {
     switch (state.step) {
       case 'property-type':
-        return !!state.propertyType;
+        // The ZIP is asked here, right after the service choice (Jim,
+        // 2026-10-16: not on the first screen). 'unknown' = the zone map
+        // couldn't answer, so the customer goes through rather than lose the lead.
+        return !!state.propertyType && (state.areaStatus === 'in' || state.areaStatus === 'unknown');
       case 'issue':
         // The description, where, and when are REQUIRED (owner request
         // 2026-08-25 — these used to hide behind an optional "Add more detail"
@@ -161,18 +161,7 @@
     intakeStore.goBack();
   }
 
-  // The service tiles wait for a served ZIP ('unknown' = the zone map couldn't
-  // answer, so they go through rather than lose the lead).
-  let zipAttempted = false;
-
   function selectTriageOption(option: Parameters<typeof intakeStore.selectOption>[0]) {
-    const s = $intakeStore;
-    if (s.triageHistory.length === 0 && s.areaStatus !== 'in' && s.areaStatus !== 'unknown') {
-      zipAttempted = true;
-      document.getElementById('intake-zip')?.focus();
-      return;
-    }
-    zipAttempted = false;
     navDir = 'forward'; // triage-node advances don't change `step`
     intakeStore.selectOption(option);
   }
@@ -322,7 +311,6 @@
     state.step !== 'triage' &&
     state.step !== 'review' &&
     state.step !== 'confirmation';
-  $: atFirstScreen = state.step === 'triage' && state.triageHistory.length === 0;
 </script>
 
 <!-- Always mounted, every step (confirmation included) and even on the
@@ -418,16 +406,17 @@
     {#key paneKey}
     <div class="step-pane" data-dir={navDir}>
     {#if state.step === 'triage' && node}
-      <QuestionCard {node} onSelect={selectTriageOption} title={atFirstScreen ? FIRST_SCREEN_TITLE : null}>
-        {#if atFirstScreen}<ZipCheck showError={zipAttempted} />{/if}
-      </QuestionCard>
+      <QuestionCard {node} onSelect={selectTriageOption} />
     {:else if state.step === 'property-type'}
       <header class="screen-head">
-        <h2>What type of property is this for?</h2>
-        <p>This helps us send the right team and pricing.</p>
+        <h2>Where's the job, and what kind of property?</h2>
+        <p>We'll check we serve your area. The property type helps us send the right team.</p>
       </header>
+      <div class="zip-slot">
+        <ZipCheck showError={attempted} />
+      </div>
       <PropertyTypeForm value={state.propertyType} />
-      {#if attempted && !isStepValid(state)}
+      {#if attempted && !state.propertyType}
         <p class="form-error">Please pick a property type to continue.</p>
       {/if}
     {:else if state.step === 'issue'}
@@ -707,6 +696,10 @@
     font-size: 0.76rem;
     line-height: 1.35;
     color: var(--color-muted);
+  }
+
+  .zip-slot {
+    margin-bottom: 1.1rem;
   }
 
   @media (min-width: 960px) {
