@@ -3,11 +3,7 @@
    * Computers only (≥960px): the customer's request so far, beside the form,
    * with the visit charge as soon as the ZIP and job type are known. On
    * phones the brand band's "Your request" chip does this job instead.
-   *
-   * Topped with the brand-photo slideshow (Cameron, 2026-10-20: photos on
-   * desktop too, without bringing back the big desktop hero he disliked).
    */
-  import PhotoSlideshow from './PhotoSlideshow.svelte';
   import { intakeStore } from '$lib/stores/intakeStore';
   import { describeTiming } from '$lib/utils/timing';
   import { propertyTypeLabel } from '$lib/types/intake';
@@ -27,11 +23,6 @@
 </script>
 
 <aside class="rail" aria-label="Your request">
-  <div class="rail-photo">
-    <PhotoSlideshow />
-    <p class="rail-photo-cap">Glass fixed right.<br />Booked in two minutes.</p>
-  </div>
-
   <section class="rail-card">
     <h2>Your request</h2>
     {#if empty}
@@ -112,33 +103,9 @@
     }
   }
 
-  .rail-photo {
-    position: relative;
-    aspect-ratio: 4 / 3;
-    max-width: 100%;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    background: var(--color-primary);
-    box-shadow: 0 12px 30px rgba(6, 3, 141, 0.12);
-  }
-
-  /* Caption over a dark fade at the bottom so it reads on any photo. */
-  .rail-photo-cap {
-    position: absolute;
-    inset: auto 0 0 0;
-    margin: 0;
-    padding: 2.2rem 1rem 0.9rem;
-    color: #fff;
-    font-weight: 800;
-    font-size: 1.05rem;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-    background: linear-gradient(180deg, transparent, rgba(6, 3, 141, 0.85));
-  }
-
   .rail-card {
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
     border-radius: var(--radius-lg);
     padding: 1.1rem;
     display: grid;
@@ -223,9 +190,15 @@
     color: var(--color-muted);
   }
 
+  /* The rail sits on the desktop photo backdrop (IntakeLayout), so the
+     trust lines are light. */
+  .trust li {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
   .trust li::before {
     content: '✓ ';
-    color: #11603b;
+    color: #9be8bd;
     font-weight: 800;
   }
 </style>

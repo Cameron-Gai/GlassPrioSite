@@ -16,6 +16,23 @@
   export let info: string | undefined = undefined;
 
   let showInfo = false;
+
+  // Photo per service tile on computers (2026-10-20): Glass Doctor brand
+  // photos and franchise job photos from the Neighborly asset pack, cropped
+  // 4:3 into static/tiles/, with the icon as a small badge. Phones keep the
+  // tinted icon panel (Cameron undid photos there the same day).
+  const TILE_PHOTOS: Partial<Record<IconKey, string>> = {
+    glass: '/tiles/glass.jpg',
+    window: '/tiles/window.jpg',
+    storefront: '/tiles/storefront.jpg',
+    patio: '/tiles/patio.jpg',
+    shower: '/tiles/shower.jpg',
+    hardware: '/tiles/hardware.jpg',
+    multi: '/tiles/multi.jpg',
+    measure: '/tiles/measure.jpg',
+    other: '/tiles/other.jpg'
+  };
+  $: photo = icon && tone !== 'emergency' ? TILE_PHOTOS[icon] : undefined;
 </script>
 
 <div class="tile">
@@ -30,8 +47,16 @@
     <span class="icon" aria-hidden="true">
       <ServiceIcon {icon} size={30} />
     </span>
+  {:else if icon && photo}
+    <span class="photo" aria-hidden="true">
+      <img src={photo} alt="" loading="lazy" decoding="async" width="640" height="480" />
+      <span class="badge"><ServiceIcon {icon} size={18} /></span>
+    </span>
+    <span class="art art-phone" data-icon={icon} aria-hidden="true">
+      <ServiceIcon {icon} size={34} />
+    </span>
   {:else if icon}
-    <!-- Picture tile (design picked 2026-10-16): a tinted panel per service. -->
+    <!-- Tinted panel for any service without a photo yet. -->
     <span class="art" data-icon={icon} aria-hidden="true">
       <ServiceIcon {icon} size={34} />
     </span>
@@ -235,6 +260,60 @@
     background: var(--color-primary-soft);
     color: var(--color-primary);
     flex-shrink: 0;
+  }
+
+  /* Photos on computers only; phones show the tinted icon panel instead. */
+  .photo {
+    position: relative;
+    display: none;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    max-width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--color-primary-soft);
+  }
+
+  .photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.25s ease;
+  }
+
+  .card:hover .photo img {
+    transform: scale(1.04);
+  }
+
+  .badge {
+    position: absolute;
+    left: 0.4rem;
+    bottom: 0.4rem;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .photo img {
+      transition: none;
+    }
+  }
+
+  @media (min-width: 960px) {
+    .photo {
+      display: block;
+    }
+
+    /* .art.art-phone so it outranks the base .art rule declared below. */
+    .art.art-phone {
+      display: none;
+    }
   }
 
   .art {
