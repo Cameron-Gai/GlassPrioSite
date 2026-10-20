@@ -42,6 +42,15 @@
     confirmation: 'Done'
   };
 
+  // Out-of-area ZIPs stop at the address step (Cameron, 2026-10-20; they used
+  // to submit with "the office will confirm coverage"). Only a definite "not
+  // in the zone map" blocks: if the lookup can't run, the customer goes on.
+  // advisoryQuote is cleared on every ZIP change, so it always belongs to the
+  // ZIP on screen.
+  function outOfArea(state: IntakeState): boolean {
+    return state.advisoryQuote?.flag === 'unserviced-or-unknown';
+  }
+
   function photosRequiredFor(state: IntakeState): boolean {
     return state.selectedJobType?.requiresPhoto === true;
   }
@@ -69,7 +78,8 @@
           state.address.street.trim() !== '' &&
           state.address.city.trim() !== '' &&
           state.address.state.trim() !== '' &&
-          /^\d{5}(-\d{4})?$/.test(state.address.zip.trim())
+          /^\d{5}(-\d{4})?$/.test(state.address.zip.trim()) &&
+          !outOfArea(state)
         );
       case 'contact':
         return (
@@ -127,7 +137,38 @@
     }
   }
 
-  function next() {
+  // The address step's ZIP lookup runs a beat after typing; Continue pressed
+  // before it answers waits for it rather than slipping an out-of-area ZIP
+  // through. A failed lookup lets the customer continue.
+  let checkingArea = false;
+  async function ensureAreaChecked(s: IntakeState): Promise<void> {
+    const zip = s.address.zip.trim().slice(0, 5);
+    const job = s.selectedJobType?.name ?? '';
+    if (s.advisoryQuote || !/^\d{5}$/.test(zip) || !job) return;
+    checkingArea = true;
+    try {
+      const res = await fetch(`/api/quote?zip=${encodeURIComponent(zip)}&jobTypeName=${encodeURIComponent(job)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if ($intakeStore.address.zip.trim().slice(0, 5) === zip) {
+          intakeStore.setAdvisoryQuote({
+            serviced: data.serviced === true,
+            osc: Number(data.osc) || 0,
+            zoneName: data.zoneName ?? null,
+            flag: data.flag ?? 'none'
+          });
+        }
+      }
+    } catch {
+      /* lookup unavailable: don't hold the customer up */
+    } finally {
+      checkingArea = false;
+    }
+  }
+
+  async function next() {
+    if (checkingArea) return;
+    if ($intakeStore.step === 'address') await ensureAreaChecked($intakeStore);
     const s = $intakeStore;
     if (!isStepValid(s)) {
       attempted = true;
@@ -440,6 +481,9 @@
       </header>
       <AddressForm value={state.address} showErrors={attempted} />
       <ZoneFeeNotice zip={state.address.zip} jobTypeName={state.selectedJobType?.name ?? ''} />
+      {#if attempted && outOfArea(state)}
+        <p class="form-error">We can't book this ZIP online. Call us if you think we should cover it.</p>
+      {/if}
     {:else if state.step === 'contact'}
       <header class="screen-head">
         <h2>How can we reach you?</h2>

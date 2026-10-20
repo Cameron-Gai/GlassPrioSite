@@ -112,10 +112,11 @@
     </div>
   {:else if quote.flag === 'unserviced-or-unknown'}
     <div class="notice out-of-area" aria-live="polite">
-      <p class="lead">We couldn't match your ZIP to our service areas.</p>
+      <!-- Out of area blocks the address step (IntakeWizard, 2026-10-20). -->
+      <p class="lead">Sorry, we don't serve this ZIP yet.</p>
       <p class="sub">
-        You can still submit and our office will confirm coverage — or call us at
-        <a href={SUPPORT_PHONE_HREF}>{SUPPORT_PHONE}</a> to check right away.
+        If you think that's a mistake, call us at
+        <a href={SUPPORT_PHONE_HREF}>{SUPPORT_PHONE}</a> and we'll double-check.
       </p>
     </div>
   {:else}
