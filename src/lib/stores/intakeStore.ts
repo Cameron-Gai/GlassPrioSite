@@ -81,6 +81,10 @@ export interface IntakeState {
   /** First-screen ZIP check against the zone map. 'unknown' = the zone map
    *  couldn't answer, so the visitor goes through (never turn away a real lead). */
   areaStatus: AreaStatus;
+  /** /book only: the ad partner's lead (via Zapier) supplied first name, phone
+   *  and email, so the contact step is skipped (Cameron, 2026-10-20). Editing
+   *  contact from review brings the step back. */
+  contactFromLead: boolean;
   /** Stripe PaymentIntent id once the card hold is authorized. */
   paymentIntentId: string | null;
   paymentAuthorized: boolean;
@@ -162,8 +166,9 @@ export const EMERGENCY_STEP_ORDER: WizardStep[] = [
 ];
 
 /** The step sequence in effect for this request. */
-export function stepsFor(state: Pick<IntakeState, 'isEmergency'>): WizardStep[] {
-  return state.isEmergency ? EMERGENCY_STEP_ORDER : STEP_ORDER;
+export function stepsFor(state: Pick<IntakeState, 'isEmergency'> & Partial<Pick<IntakeState, 'contactFromLead'>>): WizardStep[] {
+  const order = state.isEmergency ? EMERGENCY_STEP_ORDER : STEP_ORDER;
+  return state.contactFromLead ? order.filter((s) => s !== 'contact') : order;
 }
 
 function initialState(): IntakeState {
@@ -213,6 +218,7 @@ function initialState(): IntakeState {
     feeQuote: null,
     advisoryQuote: null,
     areaStatus: 'idle',
+    contactFromLead: false,
     paymentIntentId: null,
     paymentAuthorized: false,
     payLater: false,
@@ -310,6 +316,8 @@ function sanitizeForHydrate(saved: IntakeState): IntakeState {
   );
   // Guard against a step that isn't in this request's sequence (e.g. a draft
   // saved on the issue/site step before the emergency fast-track existed).
+  // A draft saved mid-edit of a lead's contact details resumes on that step.
+  if (merged.step === 'contact') merged.contactFromLead = false;
   if (!stepsFor(merged).includes(merged.step)) merged.step = 'triage';
   // The fee/payment state is dropped above, so the review step would be stale —
   // step back to contact so it re-resolves cleanly.
@@ -477,7 +485,13 @@ function createIntakeStore() {
    *  wizard's primary button then returns straight to review (finishEdit). */
   function beginEdit(step: WizardStep) {
     store.update((state) => {
-      if (!stepsFor(state).includes(step) || step === 'review') return state;
+      if (step === 'review') return state;
+      // Contact details that came from an ad lead can still be corrected from
+      // review: the step comes back for good once they're edited.
+      if (step === 'contact' && state.contactFromLead) {
+        return { ...state, step, returnToReview: true, contactFromLead: false };
+      }
+      if (!stepsFor(state).includes(step)) return state;
       return { ...state, step, returnToReview: true };
     });
   }
@@ -693,6 +707,10 @@ function createIntakeStore() {
 
   function setAreaStatus(areaStatus: AreaStatus) {
     store.update((state) => ({ ...state, areaStatus }));
+  }
+
+  function setContactFromLead(contactFromLead: boolean) {
+    store.update((state) => ({ ...state, contactFromLead }));
   }
 
   /** Advisory quote from the address-step ZIP check (summary-rail display only). */
@@ -964,6 +982,7 @@ function createIntakeStore() {
     setFeeQuote,
     setAdvisoryQuote,
     setAreaStatus,
+    setContactFromLead,
     setPaymentAuthorized,
     setPayLater,
     setPayLaterInfo,

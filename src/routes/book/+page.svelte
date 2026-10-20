@@ -3,13 +3,13 @@
    * /book — where ad landing pages send their visitors (Mancini Digital first;
    * flow agreed with Mike and Jim 2026-10-09). Mike's page collects name /
    * phone / email, counts the lead, pushes it here through Zapier, and
-   * redirects the visitor to this page. Same form and frame as the main site
-   * (IntakeLayout: ZIP first, named steps, "rather talk to a person?"); on top
-   * of that, this page:
+   * redirects the visitor to this page. It looks exactly like the main site
+   * (Cameron, 2026-10-20: same page minus Mike's code); behind the scenes it:
    *   - runs Mike's tracking code on load (AD_TRACKING_SNIPPET, see +page.server)
-   *   - prefills the contact step (and the ZIP) from the pushed lead, matched
-   *     by `lid` or the Google click id on the URL, so nobody types twice
-   *   - greets the visitor with the running man (once per session)
+   *   - fills the contact details (and the ZIP) from the pushed lead, matched
+   *     by `lid` or the Google click id on the URL. When the lead has a first
+   *     name, phone and email, the contact step is skipped entirely
+   *     (contactFromLead); otherwise it shows with what arrived filled in
    *   - reports the ZIP check, each step and the booking to window.dataLayer,
    *     so the advertiser can see where visitors drop off
    * UTM tags / click ids ride onto the ServiceTitan booking as on the main site.
@@ -17,7 +17,6 @@
   import { onDestroy, onMount } from 'svelte';
   import IntakeWizard from '$lib/components/IntakeWizard.svelte';
   import IntakeLayout from '$lib/components/IntakeLayout.svelte';
-  import RunningMan from '$lib/components/RunningMan.svelte';
   import { intakeStore, type AreaStatus } from '$lib/stores/intakeStore';
   import { attribution, readAttribution } from '$lib/attribution';
   import { describeBusinessHours, isBusinessHours } from '$lib/utils/businessHours';
@@ -52,6 +51,18 @@
     }
     if (Object.keys(patch).length) intakeStore.updateCustomer(patch);
     if (lead.zip && !s.address.zip.trim()) intakeStore.updateAddress({ zip: lead.zip });
+    // Skip the contact step only when it has everything the booking needs
+    // (last name is optional for ad leads). Not once the visitor is already
+    // on it or editing it from review.
+    const c = $intakeStore.customer;
+    const complete =
+      c.firstName.trim() !== '' &&
+      c.phone.replace(/D/g, '').length >= 10 &&
+      /^[^s@]+@[^s@]+.[^s@]+$/.test(c.email.trim());
+    const st = $intakeStore.step;
+    if (complete && st !== 'contact' && st !== 'review' && st !== 'confirmation') {
+      intakeStore.setContactFromLead(true);
+    }
   }
 
   function pollLead(key: string, triesLeft: number) {
@@ -125,8 +136,6 @@
   <meta name="robots" content="noindex" />
   {#if data.trackingSnippet}{@html data.trackingSnippet}{/if}
 </svelte:head>
-
-<RunningMan />
 
 <IntakeLayout {openNow} {hoursDescription}>
   <IntakeWizard />

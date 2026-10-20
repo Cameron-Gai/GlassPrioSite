@@ -13,40 +13,53 @@
 
   export let state: IntakeState;
 
-  const NAMES = ['Service', 'Details', 'Address', 'Contact', 'Time'];
-  const GROUP: Record<WizardStep, number> = {
-    triage: 0,
-    'property-type': 1,
-    issue: 1,
-    site: 1,
-    address: 2,
-    contact: 3,
-    scheduling: 4,
-    review: 5,
-    confirmation: 6
-  };
-
+  // Each mode lists its named steps and which named step each screen counts
+  // toward. Review sits one past the last name (everything filled in).
   // Priority requests run in a different order (EMERGENCY_STEP_ORDER): the
   // ZIP + property and address screens are "Location", the issue comes after
-  // contact, and the last step is dispatch rather than picking a time.
-  const PRIORITY_NAMES = ['Priority', 'Location', 'Contact', 'Details', 'Dispatch'];
-  const PRIORITY_GROUP: Partial<Record<WizardStep, number>> = {
-    triage: 0,
-    'property-type': 1,
-    address: 1,
-    contact: 2,
-    issue: 3,
-    review: 5,
-    confirmation: 6
-  };
+  // contact, and the last step is dispatch rather than picking a time — it
+  // fills in at review instead of being visited. On /book, when the ad lead
+  // supplied the contact details, "Contact" drops out (contactFromLead).
+  type Mode = { names: string[]; group: Partial<Record<WizardStep, number>>; lastIsDispatch: boolean };
 
-  $: idx = state.isEmergency ? (PRIORITY_GROUP[state.step] ?? GROUP[state.step]) : GROUP[state.step];
-  $: names = state.isEmergency ? PRIORITY_NAMES : NAMES;
-  $: total = state.isEmergency ? 4 : 5;
+  function modeFor(s: IntakeState): Mode {
+    if (s.isEmergency && s.contactFromLead) {
+      return {
+        names: ['Priority', 'Location', 'Details', 'Dispatch'],
+        group: { triage: 0, 'property-type': 1, address: 1, contact: 1, issue: 2, review: 4 },
+        lastIsDispatch: true
+      };
+    }
+    if (s.isEmergency) {
+      return {
+        names: ['Priority', 'Location', 'Contact', 'Details', 'Dispatch'],
+        group: { triage: 0, 'property-type': 1, address: 1, contact: 2, issue: 3, review: 5 },
+        lastIsDispatch: true
+      };
+    }
+    if (s.contactFromLead) {
+      return {
+        names: ['Service', 'Details', 'Address', 'Time'],
+        group: { triage: 0, 'property-type': 1, issue: 1, site: 1, address: 2, contact: 2, scheduling: 3, review: 4 },
+        lastIsDispatch: false
+      };
+    }
+    return {
+      names: ['Service', 'Details', 'Address', 'Contact', 'Time'],
+      group: { triage: 0, 'property-type': 1, issue: 1, site: 1, address: 2, contact: 3, scheduling: 4, review: 5 },
+      lastIsDispatch: false
+    };
+  }
+
+  $: mode = modeFor(state);
+  $: names = mode.names;
+  $: idx = mode.group[state.step] ?? 0;
+  // Dispatch is never a screen of its own, so phones count one fewer step.
+  $: total = names.length - (mode.lastIsDispatch ? 1 : 0);
   // Share of the form done: whole screens through stepsFor(), plus a nudge
   // per triage answer since triage is several questions on one step.
   $: pct = progressPct(state);
-  $: phoneLabel = state.step === 'review' ? 'Review' : names[Math.min(idx, 4)];
+  $: phoneLabel = state.step === 'review' ? 'Review' : names[Math.min(idx, names.length - 1)];
   $: phoneStep = Math.min(idx + 1, total);
 
   function progressPct(s: IntakeState): number {
@@ -60,7 +73,7 @@
 {#if state.step !== 'confirmation'}
   <ol class="sp-desk" aria-label="Progress">
     {#each names as name, i}
-      {@const skippedDone = state.isEmergency && i === 4 && idx >= 5}
+      {@const skippedDone = mode.lastIsDispatch && i === names.length - 1 && idx >= names.length}
       <li
         class:done={i < idx || skippedDone}
         class:on={i === idx}

@@ -36,7 +36,10 @@ function validate(payload: IntakePayload): string | null {
   if (
     !customer ||
     !isNonEmptyString(customer.firstName) ||
-    !isNonEmptyString(customer.lastName) ||
+    // Last name is optional: ad leads from /book arrive through Mancini's form,
+    // which may collect a first name only (Jim, 2026-10-09). The site's own
+    // contact step still asks for it.
+    typeof customer.lastName !== 'string' ||
     !isNonEmptyString(customer.phone) ||
     !isNonEmptyString(customer.email)
   ) {

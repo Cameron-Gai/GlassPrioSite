@@ -1,8 +1,9 @@
 <script lang="ts">
   /**
-   * The Glass Doctor running man dashes across the screen when an ad visitor
-   * lands on /book (Jim, 2026-10-16: franchisees love him, and corporate
-   * retiring him "was one of the worst mistakes they ever made"). Image from
+   * The Glass Doctor running man dashes across the screen when a visitor
+   * lands on the booking site (Jim, 2026-10-16: franchisees love him, and
+   * corporate retiring him "was one of the worst mistakes they ever made").
+   * On both / and /book since 2026-10-20 (the two pages match). Image from
    * Jim: static/running-man.png.
    *
    * Kept out of the way on purpose: about 4 seconds, once per browser

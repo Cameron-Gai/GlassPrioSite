@@ -17,6 +17,7 @@
   import BrandPanel from './BrandPanel.svelte';
   import MobileHero from './MobileHero.svelte';
   import SummaryRail from './SummaryRail.svelte';
+  import RunningMan from './RunningMan.svelte';
   import { intakeStore } from '$lib/stores/intakeStore';
 
   export let openNow: boolean;
@@ -24,6 +25,8 @@
 
   $: heroShown = $intakeStore.step === 'triage' && $intakeStore.triageHistory.length === 0;
 </script>
+
+<RunningMan />
 
 <div class="page">
   <div class="band">
