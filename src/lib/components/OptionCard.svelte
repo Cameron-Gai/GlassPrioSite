@@ -16,6 +16,22 @@
   export let info: string | undefined = undefined;
 
   let showInfo = false;
+
+  // Photo per service tile (2026-10-20): Glass Doctor brand photos and
+  // franchise job photos from the Neighborly asset pack, cropped 4:3 into
+  // static/tiles/. The icon rides along as a small badge.
+  const TILE_PHOTOS: Partial<Record<IconKey, string>> = {
+    glass: '/tiles/glass.jpg',
+    window: '/tiles/window.jpg',
+    storefront: '/tiles/storefront.jpg',
+    patio: '/tiles/patio.jpg',
+    shower: '/tiles/shower.jpg',
+    hardware: '/tiles/hardware.jpg',
+    multi: '/tiles/multi.jpg',
+    measure: '/tiles/measure.jpg',
+    other: '/tiles/other.jpg'
+  };
+  $: photo = icon && tone !== 'emergency' ? TILE_PHOTOS[icon] : undefined;
 </script>
 
 <div class="tile">
@@ -30,8 +46,13 @@
     <span class="icon" aria-hidden="true">
       <ServiceIcon {icon} size={30} />
     </span>
+  {:else if icon && photo}
+    <span class="photo" aria-hidden="true">
+      <img src={photo} alt="" loading="lazy" decoding="async" width="640" height="480" />
+      <span class="badge"><ServiceIcon {icon} size={18} /></span>
+    </span>
   {:else if icon}
-    <!-- Picture tile (design picked 2026-10-16): a tinted panel per service. -->
+    <!-- Tinted panel for any service without a photo yet. -->
     <span class="art" data-icon={icon} aria-hidden="true">
       <ServiceIcon {icon} size={34} />
     </span>
@@ -237,6 +258,48 @@
     flex-shrink: 0;
   }
 
+  .photo {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    max-width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--color-primary-soft);
+  }
+
+  .photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.25s ease;
+  }
+
+  .card:hover .photo img {
+    transform: scale(1.04);
+  }
+
+  .badge {
+    position: absolute;
+    left: 0.4rem;
+    bottom: 0.4rem;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .photo img {
+      transition: none;
+    }
+  }
+
   .art {
     display: grid;
     place-items: center;
@@ -291,5 +354,34 @@
     font-size: 0.92rem;
     line-height: 1.35;
     color: rgba(255, 255, 255, 0.88);
+  }
+
+  /* Two-across tiles on small phones: tighter padding and type. */
+  @media (max-width: 420px) {
+    .card:not(.emergency) {
+      padding: 0.6rem;
+      min-height: 0;
+      gap: 0.4rem;
+    }
+
+    .card:not(.emergency) .label {
+      font-size: 0.88rem;
+    }
+
+    .card:not(.emergency) .helper {
+      font-size: 0.75rem;
+    }
+
+    .info-btn {
+      width: 26px;
+      height: 26px;
+      top: 0.35rem;
+      right: 0.35rem;
+    }
+
+    .badge {
+      width: 24px;
+      height: 24px;
+    }
   }
 </style>

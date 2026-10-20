@@ -14,6 +14,8 @@
 
   /** Small "Before" / "After" tag in the corner. */
   export let showTag = true;
+  /** Use the 1920px exports (static/hero/*-1920.jpg) for full-width use. */
+  export let large = false;
 
   const SLIDES = [
     { src: '/hero/before-broken-pane.jpg', tag: 'Before' },
@@ -46,7 +48,7 @@
 
 <div class="slides" aria-hidden="true">
   {#each SLIDES.slice(0, loadedCount) as s, i (s.src)}
-    <img src={s.src} alt="" class:on={i === slide} decoding="async" fetchpriority={i === 0 ? 'high' : 'low'} />
+    <img src={large ? s.src.replace('.jpg', '-1920.jpg') : s.src} alt="" class:on={i === slide} decoding="async" fetchpriority={i === 0 ? 'high' : 'low'} />
   {/each}
   {#if showTag && SLIDES[slide].tag}<span class="tag">{SLIDES[slide].tag}</span>{/if}
 </div>
